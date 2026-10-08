@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import re
+from typing import Iterator
 from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
@@ -242,22 +243,27 @@ class NtlCrawler(BaseCrawler):
         return urls
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
+        return list(self.iter_all_products(date))
+
+    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
         """
         Main method to fetch and parse all NTL store, product, and price info.
+
+        Fork change (2026-10-08): a generator yielding one store at a time
+        (343 stores and 1.5M rows per day since NN 101/2026).
 
         Args:
             date: The date to fetch data for
 
-        Returns:
-            List of Store objects with their products.
+        Yields:
+            Store objects with their products.
         """
         csv_links = self.get_index(date)
 
         if not csv_links:
             logger.warning(f"No NTL CSV links found for date {date:%Y-%m-%d}")
-            return []
+            return
 
-        stores = []
         for url in csv_links:
             try:
                 store = self.parse_store_info(url)
@@ -279,9 +285,7 @@ class NtlCrawler(BaseCrawler):
                 continue
 
             store.items = products
-            stores.append(store)
-
-        return stores
+            yield store
 
     def fix_product_data(self, data: dict) -> dict:
         """

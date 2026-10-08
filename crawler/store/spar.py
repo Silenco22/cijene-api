@@ -2,7 +2,7 @@ import datetime
 import logging
 import re
 from json import loads
-from typing import Optional
+from typing import Iterator, Optional
 
 from crawler.store.models import Store
 
@@ -191,6 +191,9 @@ class SparCrawler(BaseCrawler):
         return store
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
+        return list(self.iter_all_products(date))
+
+    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
         """
         Main method to fetch and parse all products from Spar's price lists.
 
@@ -203,13 +206,14 @@ class SparCrawler(BaseCrawler):
 
         Raises:
             ValueError: If the price list index cannot be fetched or parsed
+
+        Fork change (2026-10-08): a generator yielding one store at a time
+        (1.3M rows per day since NN 101/2026).
         """
         # Fetch the price list index
         csv_files = self.fetch_price_list_index(date)
 
         logger.info(f"Found {len(csv_files)} CSV files in the price list index")
-
-        stores = []
 
         for filename, url in csv_files.items():
             store = self.parse_store_from_filename(filename)
@@ -227,12 +231,11 @@ class SparCrawler(BaseCrawler):
             try:
                 products = self.parse_csv(csv_content, ";")
                 store.items = products
-                stores.append(store)
             except Exception as e:
                 logger.error(f"Error processing CSV from {url}: {e}", exc_info=True)
                 continue
 
-        return stores
+            yield store
 
 
 if __name__ == "__main__":

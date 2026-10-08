@@ -1,5 +1,7 @@
 import re
+from collections.abc import Iterable
 from csv import DictWriter
+from dataclasses import dataclass
 from decimal import Decimal
 from logging import getLogger
 from os import makedirs
@@ -153,7 +155,14 @@ def save_csv(path: Path, data: list[dict], columns: list[str]):
             )
 
 
-def save_chain(chain_path: Path, stores: list[Store]):
+@dataclass
+class ChainStats:
+    n_stores: int = 0
+    n_products: int = 0
+    n_prices: int = 0
+
+
+def save_chain(chain_path: Path, stores: Iterable[Store]) -> ChainStats:
     """
     Save retail chain data to CSV files.
 
@@ -163,23 +172,64 @@ def save_chain(chain_path: Path, stores: list[Store]):
     * products.csv - containing product information with PRODUCT_COLUMNS
     * prices.csv - containing price information with PRICE_COLUMNS
 
+    Fork change (2026-10-08): prices are written store by store. Since
+    NN 101/2026 Plodine publishes ~6M price rows a day, and transforming and
+    sorting a whole chain at once peaked at 7 GB and got the crawler killed.
+    ``stores`` may be a generator: a crawler that yields one store at a time
+    then holds a single store in memory. Each store's items are released once
+    written. prices.csv is ordered by product within each store, with stores
+    in arrival order; stores.csv and products.csv stay fully sorted.
+
     Args:
         chain_path: Path to the directory where CSV files will be saved
             (will be created if it doesn't exist).
-        stores: List of Store objects containing product data.
+        stores: Store objects containing product data (list or generator).
+
+    Returns:
+        Counts of what was written.
     """
 
     makedirs(chain_path, exist_ok=True)
-    store_list, product_list, price_list = transform_products(stores)
+    stats = ChainStats()
+    store_list: list[dict] = []
+    product_map: dict[str, dict] = {}
+    prices_fp = None
+    prices_writer = None
 
-    # Sort data before writing to CSV
+    try:
+        for store in stores:
+            s_rows, p_rows, price_rows = transform_products([store])
+            store.items = []
+            store_list.extend(s_rows)
+            for row in p_rows:
+                product_map.setdefault(str(row["product_id"]), row)
+            if not price_rows:
+                continue
+            if prices_writer is None:
+                prices_fp = open(chain_path / "prices.csv", "w", newline="")
+                prices_writer = DictWriter(prices_fp, fieldnames=PRICE_COLUMNS)
+                prices_writer.writeheader()
+            price_rows.sort(key=lambda x: str(x["product_id"]))
+            for row in price_rows:
+                prices_writer.writerow(
+                    {
+                        k: normalize_whitespace(str(v).strip()) if v is not None else ""
+                        for k, v in row.items()
+                    }
+                )
+            stats.n_prices += len(price_rows)
+    finally:
+        if prices_fp is not None:
+            prices_fp.close()
+
     store_list.sort(key=lambda x: str(x["store_id"]))
-    product_list.sort(key=lambda x: str(x["product_id"]))
-    price_list.sort(key=lambda x: (str(x["store_id"]), str(x["product_id"])))
-
+    product_list = sorted(product_map.values(), key=lambda x: str(x["product_id"]))
     save_csv(chain_path / "stores.csv", store_list, STORE_COLUMNS)
     save_csv(chain_path / "products.csv", product_list, PRODUCT_COLUMNS)
-    save_csv(chain_path / "prices.csv", price_list, PRICE_COLUMNS)
+
+    stats.n_stores = len(store_list)
+    stats.n_products = len(product_list)
+    return stats
 
 
 def copy_archive_info(path: Path):

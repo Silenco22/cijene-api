@@ -1,7 +1,7 @@
 import datetime
 import logging
 import re
-from typing import Optional
+from typing import Iterator, Optional
 from urllib.parse import quote, unquote, urljoin
 
 from bs4 import BeautifulSoup
@@ -226,19 +226,26 @@ class LidlCrawler(BaseCrawler):
         return store
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
+        return list(self.iter_all_products(date))
+
+    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
         """
         Main method to fetch and parse all products from Lidl's price lists.
+
+        Fork change (2026-10-08): a generator yielding one store at a time, so
+        only one store's ~15k rows are in memory (1.7M rows per day in total
+        since NN 101/2026).
 
         Args:
             date: The date for which to fetch the price list
 
-        Returns:
-            List of Store objects, each containing its products.
+        Yields:
+            Store objects, each containing its products.
 
         Raises:
             ValueError: If no price lists are found or none can be parsed
         """
-        stores = []
+        found = False
         for url in self.get_index(date):
             try:
                 store = self.get_store_prices(url)
@@ -246,12 +253,11 @@ class LidlCrawler(BaseCrawler):
                 logger.error(f"Stopping the Lidl crawl: {e}")
                 break
             if store:
-                stores.append(store)
+                found = True
+                yield store
 
-        if not stores:
+        if not found:
             raise ValueError(f"No valid price list found for {date}")
-
-        return stores
 
 
 if __name__ == "__main__":

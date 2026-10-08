@@ -3,6 +3,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from shutil import rmtree
 from time import time
 from typing import List
 
@@ -107,44 +108,46 @@ def crawl_chain(chain: str, date: datetime.date, path: Path) -> CrawlResult:
 
     crawler = crawler_class()
     t0 = time()
+    # Fork change (2026-10-08): iter_all_products is a generator for the
+    # chains with huge lists (plodine, lidl, ntl) and save_chain writes it
+    # store by store, so crawl errors now surface while saving. Whatever was
+    # already written is removed on failure, exactly as a failed crawl used to
+    # write nothing.
     try:
-        stores = crawler.get_all_products(date)
+        stats = save_chain(path, crawler.iter_all_products(date))
     except CrawlerBlocked as err:
         logger.error(
             f"Blocked while crawling {chain} for {date:%Y-%m-%d}, "
             f"discarding the run: {err}"
         )
+        rmtree(path, ignore_errors=True)
         return CrawlResult()
     except Exception as err:
         logger.error(
             f"Error crawling {chain} for {date:%Y-%m-%d}: {err}", exc_info=True
         )
+        rmtree(path, ignore_errors=True)
         return CrawlResult()
 
     if crawler.blocked:
         logger.error(
             f"{chain} was blocked part-way through {date:%Y-%m-%d}: "
-            f"keeping the {len(stores)} store(s) collected before the block, "
+            f"keeping the {stats.n_stores} store(s) collected before the block, "
             f"this chain is incomplete"
         )
 
-    if not stores:
+    if not stats.n_stores:
         logger.error(f"No stores imported for {chain} on {date}")
+        rmtree(path, ignore_errors=True)
         return CrawlResult()
 
-    save_chain(path, stores)
     t1 = time()
-
-    all_products = set()
-    for store in stores:
-        for product in store.items:
-            all_products.add(product.product_id)
 
     return CrawlResult(
         elapsed_time=t1 - t0,
-        n_stores=len(stores),
-        n_products=len(all_products),
-        n_prices=sum(len(store.items) for store in stores),
+        n_stores=stats.n_stores,
+        n_products=stats.n_products,
+        n_prices=stats.n_prices,
     )
 
 

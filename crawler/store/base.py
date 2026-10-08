@@ -887,6 +887,17 @@ class BaseCrawler:
     def get_all_products(self, date: datetime.date) -> list[Store]:
         raise NotImplementedError()
 
+    def iter_all_products(self, date: datetime.date) -> Iterable[Store]:
+        """
+        The day's stores for crawl_chain, one at a time where possible.
+
+        Fork addition (2026-10-08): crawlers with very large price lists
+        (plodine, lidl, ntl) override this with a generator, so only one store
+        is in memory while save_chain writes it. Everyone else keeps returning
+        the full list, and get_all_products stays upstream's list contract.
+        """
+        return self.get_all_products(date)
+
     def crawl(self, date: datetime.date) -> list[Store]:
         name = self.CHAIN.capitalize()
         logger.info(f"Starting {name} crawl for date: {date}")

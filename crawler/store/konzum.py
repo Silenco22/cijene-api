@@ -3,7 +3,7 @@ import logging
 import re
 import time
 import urllib.parse
-from typing import List
+from typing import Iterator, List
 
 import httpx
 from bs4 import BeautifulSoup
@@ -234,6 +234,9 @@ class KonzumCrawler(BaseCrawler):
         return self.parse_csv(content)
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
+        return list(self.iter_all_products(date))
+
+    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
         """
         Main method to fetch and parse all store, product and price info.
 
@@ -250,10 +253,13 @@ class KonzumCrawler(BaseCrawler):
 
         Raises:
             ValueError: If no price list is found for the given date.
+
+        Fork change (2026-10-08): a generator yielding each store as its price
+        list comes in (1.8M rows per day since NN 101/2026).
         """
 
         csv_links = self.get_index(date)
-        stores: list[Store] = []
+        collected = 0
 
         pending: list[tuple[str, Store]] = []
         for url in csv_links:
@@ -314,7 +320,8 @@ class KonzumCrawler(BaseCrawler):
                     continue
 
                 store.items = products
-                stores.append(store)
+                collected += 1
+                yield store
 
             pending = missing
             if stop or sweeps >= self.SWEEP_ROUNDS:
@@ -334,10 +341,9 @@ class KonzumCrawler(BaseCrawler):
             )
 
         logger.info(
-            f"Collected {len(stores)} of {len(csv_links)} store(s) "
+            f"Collected {collected} of {len(csv_links)} store(s) "
             f"in {spent} price list requests"
         )
-        return stores
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import datetime
 import logging
 import re
+from typing import Iterator
 from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
@@ -163,6 +164,9 @@ class GavranovicCrawler(BaseCrawler):
         )
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
+        return list(self.iter_all_products(date))
+
+    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
         """
         Fetch and parse all product and price data for the given date.
 
@@ -175,15 +179,17 @@ class GavranovicCrawler(BaseCrawler):
         Returns:
             List of Store objects, one per store location, each containing
             the parsed product list.
+
+        Fork change (2026-10-08): a generator yielding one store at a time
+        (179 stores and 1.7M rows per day since the minimarkets were added).
         """
         html = self.fetch_text(self.INDEX_URL)
         csv_urls = self.get_csv_urls(html, date)
 
         if not csv_urls:
             logger.info(f"No price lists found for {date}")
-            return []
+            return
 
-        stores = []
         for url, name_part, store_id in csv_urls:
             try:
                 logger.info(f"Fetching CSV from: {url}")
@@ -201,13 +207,12 @@ class GavranovicCrawler(BaseCrawler):
 
                 store = self.parse_store_info(name_part, store_id)
                 store.items = products
-                stores.append(store)
 
             except Exception as e:
                 logger.error(f"Error processing {url}: {e}", exc_info=True)
                 continue
 
-        return stores
+            yield store
 
     def fix_product_data(self, data: dict) -> dict:
         """Mirror the promotional price for the NN 101/2026 format."""
