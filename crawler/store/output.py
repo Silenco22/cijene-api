@@ -41,10 +41,9 @@ PRICE_COLUMNS = [
     "best_price_30",
     "anchor_price",
     "special_price",
-    # NN 101/2026 availability: 1 = dostupno, 0 = nedostupno, empty = the
-    # chain does not publish it. Last, so readers that look columns up by
-    # name are unaffected.
     "available",
+    "special_sale_type",
+    "anchor_price_date",
 ]
 
 
@@ -101,9 +100,11 @@ def transform_products(
                     "best_price_30": maybe(product.best_price_30),
                     "anchor_price": maybe(product.anchor_price),
                     "special_price": maybe(product.special_price),
-                    "available": (
-                        "" if product.available is None else int(product.available)
-                    ),
+                    "available": ""
+                    if product.available is None
+                    else int(product.available),
+                    "special_sale_type": product.special_sale_type or "",
+                    "anchor_price_date": product.anchor_price_date or "",
                 }
             )
 
