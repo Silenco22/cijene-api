@@ -1,10 +1,11 @@
 import datetime
 import logging
 import re
-import zipfile
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Generator, Optional, Tuple
+from typing import Generator, Iterator, Optional, Tuple
+from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from lxml import etree  # type: ignore
 
@@ -44,7 +45,11 @@ class StudenacCrawler(BaseCrawler):
         "unit": ("JedinicaMjere", False),
         "barcode": ("Barkod", False),
         "category": ("KategorijeProizvoda", False),
+        "special_sale_type": ("NazivPosebnogOblikaProdaje", False),
     }
+
+    # <PosebniOblikProdaje> is a DA/NE flag and isn't mapped: rows on sale
+    # also fill <MaloprodajnaCijenaAkcija>.
 
     REQUIRED_COLUMNS = [
         "MaloprodajnaCijena",
@@ -57,12 +62,14 @@ class StudenacCrawler(BaseCrawler):
         "Barkod",
     ]
 
-    # Not required by NN 101/2026, so the chain may drop them when it switches.
+    # The first four aren't required by NN 101/2026, so the chain may drop
+    # them. The last one was added on 2026-11-17; older files don't have it.
     OPTIONAL_COLUMNS = [
         "NetoKolicina",
         "KategorijeProizvoda",
         "MaloprodajnaCijenaAkcija",
         "NajnizaCijena",
+        "NazivPosebnogOblikaProdaje",
     ]
 
     def parse_address(self, address: str) -> Tuple[str, str]:
@@ -80,7 +87,7 @@ class StudenacCrawler(BaseCrawler):
         try:
             # The regex matches the last set of uppercase words (city)
             # and everything before it (street address)
-            pattern = r"^(.*?) ([A-ZČĆĐŠŽ][A-ZČĆĐŠŽ\s]+)$"
+            pattern = r"^(.*?) ([A-ZČĆĐŠŽ][A-ZČĆĐŠŽ\s-]+)$"
             match = re.match(pattern, address)
 
             if match:
@@ -157,53 +164,98 @@ class StudenacCrawler(BaseCrawler):
             return None
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
+        return list(self.iter_all_products(date))
+
+    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
         """
         Main method to fetch and parse all products from Studenac's price lists.
 
         Args:
             date: The date for which to fetch the price list
 
-        Returns:
-            Tuple with the date and the list of Store objects,
-            each containing its products.
+        Yields:
+            Store objects, each containing its products.
 
         Raises:
             ValueError: If the price list cannot be fetched or parsed
+
+        Fork change (2026-11-17): a generator yielding one store at a time.
+        Since 2026-11-17 the daily ZIP holds about 1,400 stores instead of ~20.
         """
-        stores = []
         zip_url = f"{self.BASE_URL}/cjenici/PROIZVODI-{date:%Y-%m-%d}.zip"
 
         for filename, content in self.get_zip_contents(zip_url, ".xml"):
             logger.debug(f"Processing file: {filename}")
             store = self.parse_xml(content)
             if store:
-                stores.append(store)
-
-        return stores
+                yield store
 
     def get_zip_contents(
         self, url: str, suffix: str
     ) -> Generator[tuple[str, bytes], None, None]:
+        """
+        Download the daily ZIP and yield its files with the given suffix.
+
+        Until 2026-11-16 the ZIP held the store XMLs directly. Since 2026-11-17
+        it holds a few inner ZIPs with the XMLs (about 1,400 stores, 3.4 GB
+        uncompressed). Both are read one file at a time, never extracted.
+
+        Fork change: zipfile instead of the system unzip, whose non-UTF-8
+        stderr broke the error path (40683c5) and which the pipeline image
+        doesn't install. Names written as CP437 are decoded explicitly.
+        """
         with TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             temp_zip = temp_path / "archive.zip"
             with open(temp_zip, "wb") as fp:
                 self.fetch_binary(url, fp)
 
-            with zipfile.ZipFile(temp_zip, "r") as zf:
-                for info in zf.infolist():
-                    # Decode filenames encoded as CP437 by some ZIP writers
-                    try:
-                        name = info.filename.encode("cp437").decode("utf-8")
-                    except (UnicodeDecodeError, UnicodeEncodeError):
-                        name = info.filename
+            with ZipFile(temp_zip, "r") as zf:
+                for info in sorted(zf.infolist(), key=lambda i: i.filename):
+                    name = self.zip_member_name(info)
+                    if name.endswith(".zip"):
+                        # ZipFile needs a seekable file: copy the inner ZIP out
+                        inner_zip = temp_path / Path(name).name
+                        with zf.open(info) as src, open(inner_zip, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+                        yield from self.get_inner_zip_contents(inner_zip, suffix)
+                        inner_zip.unlink()
+                    elif name.endswith(suffix):
+                        yield name, zf.read(info)
 
-                    if not name.endswith(suffix):
-                        continue
+    @staticmethod
+    def zip_member_name(info: ZipInfo) -> str:
+        """The member's name, decoding CP437-encoded UTF-8 names."""
+        try:
+            return info.filename.encode("cp437").decode("utf-8")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            return info.filename
 
-                    xml_content = zf.read(info)
-                    yield name, xml_content
+    def get_inner_zip_contents(
+        self, path: Path, suffix: str
+    ) -> Generator[tuple[str, bytes], None, None]:
+        """Yield the files with the given suffix from a ZIP inside the daily ZIP."""
+        try:
+            zip_fp = ZipFile(path)
+        except BadZipFile as e:
+            logger.error(f"Failed to open inner ZIP {path.name}: {e}")
+            return
 
+        with zip_fp:
+            for file_info in zip_fp.infolist():
+                if not file_info.filename.endswith(suffix):
+                    continue
+
+                try:
+                    content = zip_fp.read(file_info)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to read {file_info.filename} from {path.name}: {e}",
+                        exc_info=True,
+                    )
+                    continue
+
+                yield file_info.filename, content
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

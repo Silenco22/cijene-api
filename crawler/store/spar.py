@@ -6,7 +6,7 @@ from typing import Iterator, Optional
 
 from crawler.store.models import Store
 
-from .base import BaseCrawler
+from .base import BaseCrawler, CrawlerBlocked
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,9 @@ class SparCrawler(BaseCrawler):
 
     CHAIN = "spar"
     BASE_URL = "https://www.spar.hr"
-    ADDRESS_PATTERN = re.compile(
-        r"^([a-zA-Z]+)_([a-zA-Z0-9_\.]+)_(\d{4,5})_([a-zA-Z_]+)_"
-    )
+    # type_city_address_id_brand_..., matched lazily so that the first store ID
+    # ends the address: newer file names repeat the ID after the brand.
+    ADDRESS_PATTERN = re.compile(r"^([a-z]+)_(.+?)_(\d{4,5})_([a-z]+)_", re.IGNORECASE)
     CITIES = [
         "varazdin",
         "valpovo",
@@ -78,16 +78,21 @@ class SparCrawler(BaseCrawler):
         "gospic",
         "sv._ivan_zelina",
         "kastel_sucurac",
+        "grubisno_polje",
     ]
 
-    ANCHOR_PRICE_DATE = datetime.date(2025, 5, 2)
+    # Renamed on 2026-11-16, when the chain moved to the NN 101/2026 format and
+    # added ~13k non-food products. Values for the products already listed did
+    # not change with the header, so neither spelling tells us which reference
+    # date (2.5.2025 or 10.9.2026) a given row refers to. No ANCHOR_PRICE_DATE.
+    ANCHOR_PRICE_COLUMN = ["sidrena cijena na 2.5.2025. (EUR)", "sidrena cijena (EUR)"]
 
     PRICE_MAP = {
         "price": ("MPC (EUR)", False),
         "unit_price": ("cijena za jedinicu mjere (EUR)", False),
         "special_price": ("MPC za vrijeme posebnog oblika prodaje (EUR)", False),
         "best_price_30": ("Najniža cijena u posljednjih 30 dana (EUR)", False),
-        "anchor_price": ("sidrena cijena na 2.5.2025. (EUR)", False),
+        "anchor_price": (ANCHOR_PRICE_COLUMN, False),
     }
 
     FIELD_MAP = {
@@ -98,12 +103,13 @@ class SparCrawler(BaseCrawler):
         "quantity": ("neto količina", False),
         "unit": ("jedinica mjere", False),
         "category": ("kategorija proizvoda", False),
+        "special_sale_type": ("Naziv posebnog oblika prodaje", False),
     }
 
     REQUIRED_COLUMNS = [
         "MPC (EUR)",
         "cijena za jedinicu mjere (EUR)",
-        "sidrena cijena na 2.5.2025. (EUR)",
+        ANCHOR_PRICE_COLUMN,
         "barkod",
         "naziv",
         "šifra",
@@ -117,6 +123,7 @@ class SparCrawler(BaseCrawler):
         "kategorija proizvoda",
         "MPC za vrijeme posebnog oblika prodaje (EUR)",
         "Najniža cijena u posljednjih 30 dana (EUR)",
+        "Naziv posebnog oblika prodaje",
     ]
 
     # Required to detect text encoding
@@ -150,7 +157,8 @@ class SparCrawler(BaseCrawler):
         """
         Extract store information from CSV filename using regex.
 
-        Supported filename pattern:
+        Supported filename patterns:
+            `hipermarket_zadar_bleiburskih_zrtava_18_8701_interspar_8701_zd_bleib._0564_20261116_0330.csv`
             `hipermarket_zadar_bleiburskih_zrtava_18_8701_interspar_zadar_0017_20250518_0330.csv`
 
         Args:
@@ -167,7 +175,7 @@ class SparCrawler(BaseCrawler):
             logger.warning(f"Failed to match filename pattern: {filename}")
             return None
 
-        store_type, city_and_address, store_id, store_name = match.groups()
+        store_type, city_and_address, store_id, brand = match.groups()
 
         for city in self.CITIES:
             if city_and_address.lower().startswith(city):
@@ -181,10 +189,11 @@ class SparCrawler(BaseCrawler):
         store = Store(
             chain="spar",
             store_id=store_id,
-            name=store_name.replace("_", " ").title(),
+            name=f"{brand} {store_city}".replace("_", " ").title(),
             store_type=store_type.lower(),
             city=store_city.replace("_", " ").title(),
-            street_address=store_address.replace("_", " ").title(),
+            # Some names have a doubled underscore, e.g. "kolakova_14__dubrava"
+            street_address=" ".join(store_address.replace("_", " ").split()).title(),
             items=[],
         )
 
@@ -224,16 +233,18 @@ class SparCrawler(BaseCrawler):
                 logger.warning(f"Skipping CSV from {url} due to store parsing failure")
                 continue
 
-            csv_content = self.fetch_text(
-                url, ["iso-8859-2", "windows-1250"], self.CSV_PREFIX
-            )
-            if not csv_content:
-                logger.warning(f"Skipping CSV from {url} due to download failure")
-                continue
-
+            # A store that fails after the retries is skipped, not the chain
             try:
-                products = self.parse_csv(csv_content, ";")
-                store.items = products
+                csv_content = self.fetch_text(
+                    url, ["iso-8859-2", "windows-1250"], self.CSV_PREFIX
+                )
+                if not csv_content:
+                    logger.warning(f"Skipping CSV from {url} due to download failure")
+                    continue
+
+                store.items = self.parse_csv(csv_content, ";")
+            except CrawlerBlocked:
+                raise
             except Exception as e:
                 logger.error(f"Error processing CSV from {url}: {e}", exc_info=True)
                 continue

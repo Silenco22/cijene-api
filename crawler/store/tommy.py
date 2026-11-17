@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Any, Optional, Tuple
 
-from crawler.store.base import BaseCrawler
+from crawler.store.base import BaseCrawler, CrawlerBlocked
 from crawler.store.models import Store
 from crawler.store.utils import to_camel_case
 
@@ -25,12 +25,19 @@ class TommyCrawler(BaseCrawler):
 
     ANCHOR_PRICE_DATE = datetime.date(2025, 5, 2)
 
+    # Since 2026-11-17 Tommy also publishes the price on 10.9.2026, for
+    # products without a 2.5.2025 price (mostly non-food). The two columns
+    # are never both filled.
+    NEW_ANCHOR_PRICE_COLUMN = "MPC_100926"
+    NEW_ANCHOR_PRICE_DATE = datetime.date(2026, 9, 10)
+
     PRICE_MAP = {
         "price": ("MPC", False),
         "unit_price": ("CIJENA_PO_JM", False),
         "special_price": ("MPC_POSEBNA_PRODAJA", False),
         "best_price_30": ("MPC_NAJNIZA_30", False),
         "anchor_price": ("MPC_020525", False),
+        "new_anchor_price": (NEW_ANCHOR_PRICE_COLUMN, False),
         "initial_price": ("PRVA_CIJENA_NOVOG_ARTIKLA", False),
     }
 
@@ -64,6 +71,7 @@ class TommyCrawler(BaseCrawler):
         "ROBNA_STRUKTURA",
         "MPC_POSEBNA_PRODAJA",
         "MPC_NAJNIZA_30",
+        "MPC_100926",
     ]
 
     def fetch_stores_list(self, date: datetime.date) -> dict[str, str]:
@@ -139,7 +147,14 @@ class TommyCrawler(BaseCrawler):
         else:
             data["date_added"] = None
 
-        return super().fix_product_data(data)
+        new_anchor_price = data.pop("new_anchor_price", None)
+        data = super().fix_product_data(data)
+
+        if data.get("anchor_price") is None and new_anchor_price is not None:
+            data["anchor_price"] = new_anchor_price
+            data["anchor_price_date"] = self.NEW_ANCHOR_PRICE_DATE.isoformat()
+
+        return data
 
     def parse_store_from_filename(
         self, filename: str
@@ -223,26 +238,31 @@ class TommyCrawler(BaseCrawler):
 
         stores = []
         for filename, url in store_map.items():
-            # Extract store information
-            store_type, store_id, address, zipcode, city = (
-                self.parse_store_from_filename(filename)
-            )
+            # A store that fails after the retries is skipped, not the chain
+            try:
+                store_type, store_id, address, zipcode, city = (
+                    self.parse_store_from_filename(filename)
+                )
 
-            store = Store(
-                chain="tommy",
-                name=f"Tommy {store_type.title()} {address}",
-                store_type=store_type,
-                store_id=store_id,
-                city=city,
-                street_address=address,
-                zipcode=zipcode,
-                items=[],
-            )
+                store = Store(
+                    chain="tommy",
+                    name=f"Tommy {store_type.title()} {address}",
+                    store_type=store_type,
+                    store_id=store_id,
+                    city=city,
+                    street_address=address,
+                    zipcode=zipcode,
+                    items=[],
+                )
 
-            csv_content = self.fetch_text(url)
-            products = self.parse_csv(csv_content)
+                csv_content = self.fetch_text(url)
+                store.items = self.parse_csv(csv_content)
+            except CrawlerBlocked:
+                raise
+            except Exception as e:
+                logger.error(f"Error processing {filename}: {e}", exc_info=True)
+                continue
 
-            store.items = products
             stores.append(store)
 
         return stores

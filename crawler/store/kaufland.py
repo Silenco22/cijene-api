@@ -55,15 +55,19 @@ class KauflandCrawler(BaseCrawler):
         "barkod",
     ]
 
-    # Availability was added on 2026-09-24 for NN 101/2026. The chain's promo
-    # marker stays the pre-existing "akc.cijena, A=akcija" flag, which carries
-    # no name for the form of sale, so special_sale_type is left unmapped.
+    # The chain's promo marker stays the pre-existing "akc.cijena, A=akcija"
+    # flag, which carries no name for the form of sale, so special_sale_type is
+    # left unmapped.
+    #
+    # "Dostupan/Nedostupan" (availability, added 2026-09-24 for NN 101/2026) is
+    # not listed: it is absent from every store file since at least 2026-11-09,
+    # and one warning per file (53 per run) hides real format changes. BOOL_MAP
+    # still reads it if it comes back.
     OPTIONAL_COLUMNS = [
         "neto količina(KG)",
         "kategorija proizvoda",
         "MPC poseb.oblik prod",
         "Najniža MPC u 30dana",
-        "Dostupan/Nedostupan",
     ]
 
     CITIES = [
@@ -251,6 +255,7 @@ class KauflandCrawler(BaseCrawler):
         #   "MPC18.10..2025=5,59€"     — double dot in date
         #   "MPC 05082025=40,21€"      — no dots in date (ddmmYYYY)
         #   "MPC 26.09.205=3,39€"      — truncated year (unparseable, price still captured)
+        #   "MPC22.10.2026=209.-€"     — whole euros written as ".-"
         #   "500 g", "Miss Dream"       — garbage from shifted columns (discarded)
         anchor_price = row.get("Sidrena cijena", "").strip()
         anchor_date = ""
@@ -259,7 +264,7 @@ class KauflandCrawler(BaseCrawler):
             # Split into date part and price part on "="
             date_part, price_str = anchor_price.split("=", 1)
             date_part = date_part[3:].strip()  # Remove "MPC" prefix
-            price_str = price_str.strip().rstrip("€").strip()
+            price_str = price_str.strip().rstrip("€").strip().rstrip("-")
 
             # Always use the price if we got one
             row["Sidrena cijena"] = price_str

@@ -13,7 +13,17 @@ from .base import BaseCrawler
 
 logger = logging.getLogger(__name__)
 
-CSV_DATE_PATTERN = re.compile(r"Cijen[a-z]+-(\d{2}\.\d{2}\.\d{4})\.csv$")
+# Seen: "Cijenik-DD.MM.YYYY.csv", "Cijene-...", "Cjenik-...", "Cijenik12.11.2026.csv",
+# and since 2026-11-17 "Prodavaonica_ZAGREBACKA_12_PAG_PJ01_5_17.11.2026_13_11.csv"
+CSV_DATE_PATTERN = re.compile(
+    r"(?:Ci?jen[a-z]+-?|_)(\d{2}\.\d{2}\.\d{4})(?:_\d{2}_\d{2})?\.csv$"
+)
+
+# Store code in the file names used since 2026-11-17, e.g. "..._PAG_PJ01_5_..."
+STORE_CODE_PATTERN = re.compile(r"_(PJ\d+)_")
+
+# The newer variant spells the anchor date out: "Cijena na datum 02.05.2025: 1,87 EUR"
+ANCHOR_DATE_PATTERN = re.compile(r"\d{1,2}\.\d{1,2}\.\d{4}")
 
 
 class LorencoCrawler(BaseCrawler):
@@ -23,9 +33,16 @@ class LorencoCrawler(BaseCrawler):
     BASE_URL = "https://lorenco.hr"
     INDEX_URL = f"{BASE_URL}/dnevne-cijene/"
 
-    # Lorenco has global prices, not per-store prices
+    # Lorenco publishes one price list, for its store PJ01 in Pag. The file
+    # names give the store since 2026-11-17. The ID stays "all" so the store
+    # keeps its price history; change it when a second store appears.
     STORE_ID = "all"
+    STORE_CODE = "PJ01"
     STORE_NAME = "Lorenco"
+    STORE_TYPE = "prodavaonica"
+    STREET_ADDRESS = "Zagrebačka 12"
+    CITY = "Pag"
+    ZIPCODE = "23250"
 
     # Map CSV columns to price fields
     PRICE_MAP = {
@@ -56,9 +73,15 @@ class LorencoCrawler(BaseCrawler):
         "DatumSid",
     ]
 
+    # A full price list has ~20k products. Now and then the chain publishes
+    # only a few changed prices for the day instead. The API serves only the
+    # chain's latest load, so importing such a file would hide the full list.
+    MIN_PRODUCTS = 1000
+
     def get_csv_url(self, soup: BeautifulSoup, date: datetime.date) -> str | None:
         """Find the CSV URL for the given date from the index page."""
         hr_date = date.strftime("%d.%m.%Y")
+        urls = []
 
         for anchor in soup.select("a[href$='.csv']"):
             href = anchor.get("href")
@@ -68,11 +91,38 @@ class LorencoCrawler(BaseCrawler):
             path = urlparse(href).path
             m = CSV_DATE_PATTERN.search(path)
             if m and m.group(1) == hr_date:
-                return href
+                urls.append(href)
 
-        return None
+        # Price lists of another store must not be read as store PJ01
+        other_stores = [
+            url
+            for url in urls
+            if (m := STORE_CODE_PATTERN.search(url)) and m.group(1) != self.STORE_CODE
+        ]
+        if other_stores:
+            logger.warning(
+                f"Lorenco published price lists for other stores, not crawled: "
+                f"{other_stores}"
+            )
+
+        return next((url for url in urls if url not in other_stores), None)
 
     def read_csv(self, text: str, delimiter: str = ",") -> DictReader:
+        # Since 2026-11-17 the file starts with a few lines of company and
+        # store info before the header ("LORENCO d.o.o.", "OIB: ...",
+        # "Prodavaonica 01", blank). Skip to the header row.
+        lines = text.splitlines()
+        header = next(
+            (
+                i
+                for i, line in enumerate(lines)
+                if line.startswith(f"Barkod{delimiter}")
+            ),
+            0,
+        )
+        if header:
+            text = "\n".join(lines[header:])
+
         # Lorenco publishes two CSV variants: an older one with a single "MPC"
         # column, and a newer one that splits price into "Cijena" (whole) +
         # "CijenaDec" (hundredths). Declare a synthetic "MPC" fieldname so
@@ -94,6 +144,9 @@ class LorencoCrawler(BaseCrawler):
             whole = (row.get("Cijena") or "").strip()
             dec = (row.get("CijenaDec") or "").strip()
             row["MPC"] = f"{whole},{dec.zfill(2)}" if whole else ""
+
+        m = ANCHOR_DATE_PATTERN.search(row.get("DatumSid") or "")
+        row["DatumSid"] = m.group(0) if m else ""
         return super().parse_csv_row(row)
 
     def fix_product_data(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -136,18 +189,21 @@ class LorencoCrawler(BaseCrawler):
 
         products = self.parse_csv(csv_content, delimiter=";")
 
-        if not products:
-            logger.warning(f"No products found for date {date}")
+        if len(products) < self.MIN_PRODUCTS:
+            logger.warning(
+                f"Skipping {csv_url}: {len(products)} products, "
+                f"expected at least {self.MIN_PRODUCTS} for a full price list"
+            )
             return []
 
         store = Store(
             chain=self.CHAIN,
-            store_type="store",
+            store_type=self.STORE_TYPE,
             store_id=self.STORE_ID,
             name=self.STORE_NAME,
-            street_address="",
-            zipcode="",
-            city="",
+            street_address=self.STREET_ADDRESS,
+            zipcode=self.ZIPCODE,
+            city=self.CITY,
             items=products,
         )
 

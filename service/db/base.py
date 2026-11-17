@@ -333,6 +333,7 @@ class Database(ABC):
 
         This method computes min/avg/max prices for all products in all stores
         for a given chain and date, and stores them in a separate table.
+        Prices of items marked as unavailable are left out.
 
         Args:
             date: The date for which to compute prices.
@@ -346,6 +347,43 @@ class Database(ABC):
 
         Args:
             date: The date for which to compute stats.
+        """
+        pass
+
+    @abstractmethod
+    async def count_prices_before(self, before: date) -> dict[date, int]:
+        """
+        Count the price rows that delete_prices_before() would delete.
+
+        Args:
+            before: Count rows with a price date before this date.
+
+        Returns:
+            Number of rows per price date, oldest first. Dates with no rows
+            to delete are not included.
+        """
+        pass
+
+    @abstractmethod
+    async def delete_prices_before(self, before: date) -> dict[date, int]:
+        """
+        Delete the price rows with a price date before the given date.
+
+        The rows of each chain's latest data date stay, also when that date
+        is before the given date, so the API still shows chains that stopped
+        publishing data. Computed chain prices and chain stats stay.
+
+        Each date is deleted in a separate transaction. An interrupted run
+        keeps the dates it finished, and the next run continues from there.
+        After the delete, storage maintenance runs so that the database can
+        use the space again. This can take several minutes.
+
+        Args:
+            before: Delete rows with a price date before this date.
+
+        Returns:
+            Number of deleted rows per price date, oldest first. Dates with
+            no deleted rows are not included.
         """
         pass
 
@@ -383,6 +421,7 @@ class Database(ABC):
         self,
         product_ids: list[int],
         store_ids: list[int] | None = None,
+        include_unavailable: bool = False,
     ) -> list[StorePrice]:
         """
         For given products return latest available prices per store.
@@ -390,6 +429,9 @@ class Database(ABC):
         Args:
             product_ids: The IDs of the products to fetch
             store_ids: Optional list of store IDs to filter by.
+            include_unavailable: Also return prices of items marked as
+                unavailable. Items without availability info are always
+                returned.
 
         Returns:
             A list of StorePrice objects

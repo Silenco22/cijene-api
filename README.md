@@ -3,8 +3,11 @@
 Servis za preuzimanje javnih podataka o cijenama proizvoda u trgovačkim lancima u Republici Hrvatskoj.
 
 Preuzimanje podataka o cijenama proizvoda u trgovačkim lancima u Republici Hrvatskoj
-temeljeno je na Odluci o objavi cjenika i isticanju dodatne cijene kao mjeri izravne
-kontrole cijena u trgovini na malo, NN 75/2025 od 2.5.2025.
+temeljeno je na Odluci o objavi cjenika proizvoda i usluga kao mjera izravne kontrole
+cijena i Odluci o isticanju dodatne cijene kao mjera izravne kontrole cijena
+(NN 101/2026, 110/2026), koje se primjenjuju od 17.11.2026. Do tada se primjenjivala
+Odluka o objavi cjenika i isticanju dodatne cijene kao mjeri izravne kontrole cijena
+u trgovini na malo, NN 75/2025 od 2.5.2025.
 
 Trenutno podržani trgovački lanci:
 
@@ -194,6 +197,57 @@ Stats servis može se koristiti za:
 - **Batch procesiranje** statistika za više datuma
 - **Nezavisan rad** od import procesa za bolje performanse
 
+#### Brisanje starih cijena (opcionalno)
+
+Tablica `prices` (cijene po trgovinama) raste za više milijuna redaka
+dnevno. Ukoliko želite brisati stare detaljne podatke o cijenama
+(`prices` tablica), možete koristiti `clean_prices` naredbu:
+
+```bash
+# Brisanje cijena starijih od 30 dana
+uv run -m service.db.clean_prices --keep-days=30
+
+# Samo prikaz broja redaka za brisanje, bez brisanja
+uv run -m service.db.clean_prices --keep-days=30 --dry-run
+
+# S debug informacijama
+uv run -m service.db.clean_prices --keep-days=30 -d
+```
+
+Opcija `--keep-days` je obavezna i mora biti između 7 i 360. Skripta briše
+cijene čiji je datum stariji od današnjeg datuma umanjenog za zadani broj
+dana.
+
+Što ostaje:
+- Najnoviji podaci svakog lanca, i kad su stariji od granice, kako bi API i
+  dalje prikazivao lance koji su prestali objavljivati cijene. Za takve
+  lance skripta ispisuje upozorenje.
+- Izračunate statistike (`chain_prices` i `chain_stats`) za sve datume.
+
+Napomene:
+- Ako naknadno uvezete podatke za datum stariji od granice, sljedeće
+  pokretanje obrisat će cijene po trgovinama za taj datum. Statistike ostaju.
+- Svaki datum briše se u zasebnoj transakciji. Ako prekinete skriptu,
+  obrisani datumi ostaju obrisani, a sljedeće pokretanje nastavlja od
+  sljedećeg datuma.
+- (PostgreSQL) Nakon brisanja skripta pokreće `VACUUM` i `ANALYZE` na
+  tablici `prices`, kako bi baza mogla ponovo koristiti oslobođeni
+  prostor. Datoteke baze se ne smanjuju. Na velikoj bazi to traje
+  nekoliko minuta i može dosta opteretiti disk.
+- (PostgreSQL) Ako nakon `VACUUM`-a u tablici ostane puno obrisanih redaka,
+  skripta ispisuje upozorenje. Najčešći uzrok je transakcija koja je bila
+  otvorena prije brisanja. Te retke uklanja sljedeće pokretanje.
+- Pokrećite skriptu jednom dnevno, u vrijeme slabog prometa, i ne u isto
+  vrijeme kad i uvoz podataka, ponovno pokretanje API-ja ili deploy. Uvoz i
+  API pri pokretanju ažuriraju shemu baze i čekaju da `VACUUM` završi, a za
+  to vrijeme blokiraju upite na tablicu `stores`, tj. veći dio API-ja.
+
+Primjer za cron (svaki dan u 4:00):
+
+```
+0 4 * * * cd /path/to/cijene && /path/to/uv run --frozen -m service.db.clean_prices --keep-days=30
+```
+
 ## Dodatni podaci o proizvodima i trgovinama
 
 Dodatni pročišćeni podaci o proizvodima (naziv, marka, količina, jedinica mjere)
@@ -233,8 +287,11 @@ upotrebu.
 Ovaj projekt je licenciran pod [AGPL-3 licencom](LICENSE).
 
 Podaci prikupljeni putem ovog projekta su javni i dostupni svima, temeljem
-Odluke o objavi cjenika i isticanju dodatne cijene kao mjeri izravne
-kontrole cijena u trgovini na malo, NN 75/2025 od 2.5.2025.
+Odluke o objavi cjenika proizvoda i usluga kao mjera izravne kontrole cijena
+i Odluke o isticanju dodatne cijene kao mjera izravne kontrole cijena
+(NN 101/2026, 110/2026), odnosno za podatke do 16.11.2026. temeljem Odluke o
+objavi cjenika i isticanju dodatne cijene kao mjeri izravne kontrole cijena u
+trgovini na malo, NN 75/2025 od 2.5.2025.
 
 Pročišćeni CSV podaci o proizvodima
 ([`enrichment/products.csv`](enrichment/products.csv))

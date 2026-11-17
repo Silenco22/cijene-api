@@ -2,6 +2,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import date
+from time import monotonic
 from typing import (
     Any,
     AsyncGenerator,
@@ -319,6 +320,7 @@ class PostgresDatabase(Database):
         self,
         product_ids: list[int],
         store_ids: list[int] | None = None,
+        include_unavailable: bool = False,
     ) -> list[StorePrice]:
         async with self._get_conn() as conn:
             query = """
@@ -338,6 +340,9 @@ class PostgresDatabase(Database):
                     prices.best_price_30,
                     prices.unit_price,
                     prices.anchor_price,
+                    prices.available,
+                    prices.special_sale_type,
+                    prices.anchor_price_date,
                     stores.code AS store_code,
                     stores.type,
                     stores.address,
@@ -364,6 +369,10 @@ class PostgresDatabase(Database):
                 params.append(store_ids)
                 param_idx += 1
 
+            if not include_unavailable:
+                # NULL means the chain doesn't publish availability
+                query += " AND prices.available IS DISTINCT FROM FALSE"
+
             rows = await conn.fetch(query, *params)
 
             return [
@@ -376,6 +385,9 @@ class PostgresDatabase(Database):
                     unit_price=row["unit_price"],
                     best_price_30=row["best_price_30"],
                     anchor_price=row["anchor_price"],
+                    available=row["available"],
+                    special_sale_type=row["special_sale_type"],
+                    anchor_price_date=row["anchor_price_date"],
                     store=Store(
                         chain_id=row["chain_id"],
                         code=row["store_code"],
@@ -633,7 +645,10 @@ class PostgresDatabase(Database):
                     special_price DECIMAL(10, 2),
                     unit_price DECIMAL(10, 2),
                     best_price_30 DECIMAL(10, 2),
-                    anchor_price DECIMAL(10, 2)
+                    anchor_price DECIMAL(10, 2),
+                    available BOOLEAN,
+                    special_sale_type VARCHAR(255),
+                    anchor_price_date DATE
                 )
                 """
             )
@@ -649,6 +664,9 @@ class PostgresDatabase(Database):
                         p.unit_price,
                         p.best_price_30,
                         p.anchor_price,
+                        p.available,
+                        p.special_sale_type,
+                        p.anchor_price_date,
                     )
                     for p in prices
                 ),
@@ -663,7 +681,10 @@ class PostgresDatabase(Database):
                     special_price,
                     unit_price,
                     best_price_30,
-                    anchor_price
+                    anchor_price,
+                    available,
+                    special_sale_type,
+                    anchor_price_date
                 )
                 SELECT * from temp_prices
                 ON CONFLICT DO NOTHING
@@ -768,7 +789,9 @@ class PostgresDatabase(Database):
                         2
                     ) AS avg_price
                 FROM prices
-                WHERE price_date = $1
+                -- An unavailable item's price can't be paid, so it isn't
+                -- counted. NULL means the chain doesn't publish availability.
+                WHERE price_date = $1 AND available IS DISTINCT FROM FALSE
                 GROUP BY chain_product_id, price_date
                 ON CONFLICT (chain_product_id, price_date)
                 DO UPDATE SET
@@ -813,6 +836,177 @@ class PostgresDatabase(Database):
                     record["price_count"],
                     record["store_count"],
                 )
+
+    async def _get_kept_chains(self, before: date) -> dict[date, list[int]]:
+        """
+        Find the chains whose latest data is from before the given date.
+
+        Returns:
+            Chain IDs per latest data date. The rows of these chains on
+            that date stay.
+        """
+        async with self._get_conn() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT chain_id, max(price_date) AS latest
+                FROM chain_stats
+                GROUP BY chain_id
+                HAVING max(price_date) < $1
+                """,
+                before,
+            )
+        kept: dict[date, list[int]] = {}
+        for row in rows:
+            kept.setdefault(row["latest"], []).append(row["chain_id"])
+        return kept
+
+    async def _price_dates_before(self, before: date) -> AsyncIterator[date]:
+        """
+        Yield the price dates before the given date that have rows, oldest first.
+
+        Each step reads one entry of the price date index, so the cost depends
+        on the number of dates with rows, not on the number of days between
+        the oldest date and the given date. The next date is read after the
+        caller has processed the current one.
+        """
+        price_date = await self._fetchval(
+            "SELECT min(price_date) FROM prices WHERE price_date < $1",
+            before,
+        )
+        while price_date is not None:
+            yield price_date
+            price_date = await self._fetchval(
+                """
+                SELECT min(price_date) FROM prices
+                WHERE price_date > $1 AND price_date < $2
+                """,
+                price_date,
+                before,
+            )
+
+    @staticmethod
+    def _old_prices_filter(
+        price_date: date, kept: dict[date, list[int]]
+    ) -> tuple[str, list[Any]]:
+        """
+        Build the WHERE clause and arguments for the old rows of one date.
+
+        Returns:
+            The condition and its query arguments.
+        """
+        chain_ids = kept.get(price_date)
+        if not chain_ids:
+            return "price_date = $1", [price_date]
+        condition = """
+            price_date = $1
+            AND NOT EXISTS (
+                SELECT 1 FROM chain_products cp
+                WHERE cp.id = prices.chain_product_id
+                  AND cp.chain_id = ANY($2::int[])
+            )
+        """
+        return condition, [price_date, chain_ids]
+
+    async def count_prices_before(self, before: date) -> dict[date, int]:
+        kept = await self._get_kept_chains(before)
+        counts: dict[date, int] = {}
+        async for price_date in self._price_dates_before(before):
+            condition, args = self._old_prices_filter(price_date, kept)
+            count = await self._fetchval(
+                f"SELECT count(*) FROM prices WHERE {condition}", *args
+            )
+            if count:
+                counts[price_date] = count
+            else:
+                self.logger.debug(f"{price_date}: no rows to delete")
+        return counts
+
+    async def delete_prices_before(self, before: date) -> dict[date, int]:
+        kept = await self._get_kept_chains(before)
+        deleted: dict[date, int] = {}
+        async for price_date in self._price_dates_before(before):
+            condition, args = self._old_prices_filter(price_date, kept)
+            t0 = monotonic()
+            async with self._atomic() as conn:
+                status = await conn.execute(
+                    f"DELETE FROM prices WHERE {condition}", *args
+                )
+            count = int(status.split()[-1])
+            if count:
+                deleted[price_date] = count
+                self.logger.info(
+                    f"{price_date}: deleted {count:,} rows in {monotonic() - t0:.0f} s"
+                )
+            else:
+                self.logger.debug(f"{price_date}: no rows to delete")
+
+        if deleted:
+            await self._vacuum_prices(sum(deleted.values()))
+        return deleted
+
+    async def _vacuum_prices(self, deleted: int) -> None:
+        """
+        Run VACUUM and ANALYZE on the prices table after a delete.
+
+        VACUUM records the space of the deleted rows in the free space map,
+        so that imports use it again instead of making the table larger.
+        Server messages (the VERBOSE report, a warning if VACUUM skips the
+        table) go to the log.
+
+        Args:
+            deleted: Number of rows deleted before this call.
+        """
+
+        def log_server_message(
+            _conn: asyncpg.Connection, msg: asyncpg.PostgresLogMessage
+        ) -> None:
+            fields = msg.as_dict()
+            severity = fields.get("severity_en", "")
+            level = logging.WARNING if severity == "WARNING" else logging.INFO
+            self.logger.log(level, f"server {severity}: {fields.get('message')}")
+
+        # The pool resets the session settings when the connection goes back.
+        async with self._get_conn() as conn:
+            conn.add_log_listener(log_server_message)
+            try:
+                # Enough memory to remove ~170M rows in one pass over the
+                # indexes (PostgreSQL 15/16 use 6 bytes per row). Allocated
+                # as needed.
+                await conn.execute("SET maintenance_work_mem = '1GB'")
+
+                # VACUUM must not run inside a transaction block, so it is a
+                # separate statement. PARALLEL 0: a parallel VACUUM needs
+                # shared memory, which fails in containers with a small
+                # /dev/shm.
+                self.logger.info("Running VACUUM on prices")
+                t0 = monotonic()
+                await conn.execute("VACUUM (VERBOSE, PARALLEL 0) prices")
+                self.logger.info(f"VACUUM done in {monotonic() - t0:.0f} s")
+
+                # After VACUUM, n_dead_tup is the number of dead rows it could
+                # not remove. Read it before ANALYZE replaces it with an
+                # estimate.
+                dead = await conn.fetchval(
+                    """
+                    SELECT n_dead_tup FROM pg_stat_user_tables
+                    WHERE relid = 'prices'::regclass
+                    """
+                )
+                dead = dead or 0
+                if dead > deleted // 100:
+                    self.logger.warning(
+                        f"{dead:,} dead rows are still in prices after VACUUM. "
+                        "An open transaction older than the delete keeps them "
+                        "until the next run; see also the server messages above."
+                    )
+                else:
+                    self.logger.info(f"{dead:,} dead rows are still in prices")
+
+                t0 = monotonic()
+                await conn.execute("ANALYZE prices")
+                self.logger.info(f"ANALYZE done in {monotonic() - t0:.0f} s")
+            finally:
+                conn.remove_log_listener(log_server_message)
 
     async def get_user_by_api_key(self, api_key: str) -> User | None:
         async with self._get_conn() as conn:

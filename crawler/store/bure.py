@@ -36,6 +36,13 @@ STORES = {
     },
 }
 
+# Points of sale in the daily ZIP since 2026-11-17 that are not grocery shops.
+# Their files give no address.
+SKIPPED_STORES = {
+    "45": "clothing",
+    "55": "drinks only, probably a café",
+}
+
 
 class BureCrawler(BaseCrawler):
     """
@@ -71,6 +78,13 @@ class BureCrawler(BaseCrawler):
         "unit": ("JedinicaMjere", False),
         "barcode": ("Barkod", False),
         "category": ("KategorijeProizvoda", False),
+        "special_sale_type": ("NazivPosebnogOblikaProdaje", False),
+    }
+
+    # <PosebniOblikProdaje> is a DA/NE flag and isn't mapped: rows on sale
+    # also fill <MaloprodajnaCijenaAkcija>.
+    BOOL_MAP = {
+        "available": ("Dostupnost", False),
     }
 
     REQUIRED_COLUMNS = [
@@ -84,12 +98,15 @@ class BureCrawler(BaseCrawler):
         "Barkod",
     ]
 
-    # Not required by NN 101/2026, so the chain may drop them when it switches.
+    # The first four aren't required by NN 101/2026, so the chain may drop
+    # them. The last two were added on 2026-10-27; older files don't have them.
     OPTIONAL_COLUMNS = [
         "NetoKolicina",
         "KategorijeProizvoda",
         "MaloprodajnaCijenaAkcija",
         "NajnizaCijena",
+        "NazivPosebnogOblikaProdaje",
+        "Dostupnost",
     ]
 
     def get_zip_url(self, date: datetime.date) -> str:
@@ -205,10 +222,11 @@ class BureCrawler(BaseCrawler):
                 if adresa_elem is not None and adresa_elem.text
                 else ""
             )
-            logger.warning(
-                f"Unknown Bure store_id {store_id!r} (Adresa: {adresa!r}), "
-                f"add it to the STORES map in bure.py"
-            )
+            if store_id not in SKIPPED_STORES:
+                logger.warning(
+                    f"Unknown Bure store_id {store_id!r} (Adresa: {adresa!r}), "
+                    f"add it to the STORES map in bure.py"
+                )
             info = {
                 "name": f"Bure {store_id}",
                 "street_address": adresa.title(),
@@ -239,6 +257,8 @@ class BureCrawler(BaseCrawler):
         """
         root = etree.fromstring(xml_content)
         store = self.build_store(root)
+        if store.store_id in SKIPPED_STORES:
+            return store, []
 
         product_elems = root.xpath("//Proizvod")
         self.check_xml_columns(product_elems)
@@ -289,6 +309,13 @@ class BureCrawler(BaseCrawler):
                 store, products = self.parse_xml(content)
             except Exception as e:
                 logger.error(f"Failed to parse Bure XML {filename}: {e}", exc_info=True)
+                continue
+
+            if store.store_id in SKIPPED_STORES:
+                logger.info(
+                    f"Skipping Bure store {store.store_id} "
+                    f"({SKIPPED_STORES[store.store_id]}): not a grocery shop"
+                )
                 continue
 
             if not products:
