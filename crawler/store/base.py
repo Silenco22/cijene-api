@@ -1,4 +1,5 @@
 import datetime
+import re
 import unicodedata
 from csv import DictReader
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
@@ -36,6 +37,20 @@ class CrawlerBlocked(Exception):
     """
 
 
+class CrawlerFormatChanged(CrawlerBlocked):
+    """
+    The chain's price lists no longer have a column we require: the first
+    FORMAT_FAILURE_LIMIT lists of the run all failed the column check, and none
+    passed it. Every later list would fail the same way.
+
+    Fork change (2026-11-18): on that day Boso dropped a required column and the
+    crawl still fetched all 283 lists at its 7 s pacing, 66 minutes for nothing.
+    A subclass of CrawlerBlocked, so the crawlers that end the chain on a block
+    end it on this too, and like a block it is raised again before every
+    further request (see `format_changed`).
+    """
+
+
 # A source column (or XML tag) may be known under several names, for example
 # while a chain migrates from one header to another. A spec is either a single
 # name or a list of accepted spellings; the first one present in the file wins.
@@ -43,6 +58,10 @@ ColumnSpec = str | list[str]
 
 # field name -> (names as declared, names lowercased for lookup, is_required)
 CompiledSpec = tuple[str, list[str], list[str], bool]
+
+# A child tag name as written in the XML maps (a letter or "_", then letters,
+# digits, "_", "." or "-"): what `BaseCrawler._xml_children` can look up.
+PLAIN_TAG_NAME = re.compile(r"[^\W\d][\w.\-]*")
 
 
 class BaseCrawler:
@@ -144,6 +163,15 @@ class BaseCrawler:
     A date the chain publishes per product takes precedence.
     """
 
+    FORMAT_FAILURE_LIMIT = 5
+    """
+    Price lists in a row, from the start of a run, that may fail the required
+    column check before the chain is given up (CrawlerFormatChanged). Once one
+    list has passed, a failing list is only skipped, as before: a chain moving
+    to a new header store by store keeps the stores still on the old one (Boso
+    on 2026-11-17: 1 of 283 lists failed, the last but one).
+    """
+
     TRUE_VALUES = frozenset({"dostupno", "dostupan", "da", "d", "1", "true", "yes"})
     FALSE_VALUES = frozenset(
         {"nedostupno", "nedostupan", "ne", "n", "0", "false", "no"}
@@ -162,6 +190,15 @@ class BaseCrawler:
         self._price_specs = self._compile_map(self.PRICE_MAP)
         self._field_specs = self._compile_map(self.FIELD_MAP)
         self._bool_specs = self._compile_map(self.BOOL_MAP)
+        # The names an XML product reads from `_xml_children`; any other name
+        # (an XPath expression) is still asked through XPath.
+        self._xml_plain_names = {
+            name
+            for specs in (self._price_specs, self._field_specs, self._bool_specs)
+            for _field, names, _keys, _required in specs
+            for name in names
+            if PLAIN_TAG_NAME.fullmatch(name)
+        }
 
         self._required_specs = [
             self._names_and_keys(spec) for spec in self.REQUIRED_COLUMNS
@@ -185,6 +222,15 @@ class BaseCrawler:
         how many per-store `except Exception` handlers swallow the error, and
         checked again by crawl_chain so the chain is reported as failed.
         """
+
+        self.format_changed = False
+        """
+        Set once the first FORMAT_FAILURE_LIMIT price lists all failed the
+        column check, and never cleared. Checked before every request, like
+        `blocked`, and by crawl_chain to report why the chain is empty.
+        """
+        self._format_failures = 0
+        self._format_passed = False
 
         self.requests_made = 0
         """Attempts sent for this chain, retries included. Konzum caps on it."""
@@ -226,6 +272,9 @@ class BaseCrawler:
 
         Raises:
             ValueError: If a required column is missing.
+            CrawlerFormatChanged: If a required column is missing and so far
+                every file of this run has failed this check, now
+                FORMAT_FAILURE_LIMIT of them.
         """
         present = {name.lower() if fold_case else name for name in available if name}
 
@@ -239,9 +288,18 @@ class BaseCrawler:
         absent = missing(self._required_specs)
         if absent:
             found = ", ".join(name for name in available if name)
-            raise ValueError(
-                f"Missing required column(s): {', '.join(absent)}. Found: {found}"
-            )
+            message = f"Missing required column(s): {', '.join(absent)}. Found: {found}"
+            if not self._format_passed:
+                self._format_failures += 1
+                if self._format_failures >= self.FORMAT_FAILURE_LIMIT:
+                    self.format_changed = True
+                    raise CrawlerFormatChanged(
+                        f"{self.CHAIN}: the first {self._format_failures} price "
+                        f"lists all failed the column check, giving up the chain "
+                        f"(the format changed?). {message}"
+                    )
+            raise ValueError(message)
+        self._format_passed = True
 
         absent = missing(self._optional_specs)
         if absent:
@@ -379,9 +437,15 @@ class BaseCrawler:
         Raises:
             CrawlerBlocked: Upstream is refusing us; no further request is made
                 for the rest of this crawler's life.
+            CrawlerFormatChanged: The chain's lists are in a format we cannot
+                read; no further request is made either.
             httpx.HTTPError: The last attempt failed, or the failure is not
                 worth retrying.
         """
+        if self.format_changed:
+            raise CrawlerFormatChanged(
+                f"{self.CHAIN}: not requesting {url}, the price list format changed"
+            )
         if self.blocked:
             raise CrawlerBlocked(
                 f"{self.CHAIN}: refusing to request {url}, already blocked"
@@ -696,6 +760,10 @@ class BaseCrawler:
         """
         # Clean up common noise: trailing dots, double dots
         value = value.strip().rstrip(".").replace("..", ".")
+        # Fork change (2026-11-18): most rows have no date, and three failing
+        # strptime calls on "" were 11% of a CSV chain's parse time.
+        if not value:
+            return ""
 
         for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d%m%Y"):
             try:
@@ -808,6 +876,51 @@ class BaseCrawler:
                 return ""
         return ""
 
+    @staticmethod
+    def _xml_children(elem: Any) -> tuple[dict[str, str], set[str]]:
+        """
+        Each child tag's text, read in one pass over the element.
+
+        Gives `_xml_text`'s answers for a plain tag name: a tag's text is the
+        first text node inside any child of that name, and a tag present
+        without text is in `present` only, which reads as "".
+
+        Fork change (2026-11-18): one XPath query per field and product was
+        two thirds of Studenac's parse time (4.85M products a day, 27 min).
+        """
+        texts: dict[str, str] = {}
+        present: set[str] = set()
+        for child in elem:
+            tag = child.tag
+            if not isinstance(tag, str):  # comments and processing instructions
+                continue
+            present.add(tag)
+            if tag in texts:
+                continue
+            text = child.text
+            if text is None:
+                # name/text() also finds text after a nested element or comment
+                text = next((sub.tail for sub in child if sub.tail is not None), None)
+            if text is not None:
+                texts[tag] = text
+        return texts, present
+
+    def _xml_field(
+        self, elem: Any, children: tuple[dict[str, str], set[str]], names: list[str]
+    ) -> str:
+        """`_xml_text` read from `_xml_children`. A name that is not a plain
+        tag name still goes through XPath."""
+        texts, present = children
+        for name in names:
+            if name in self._xml_plain_names:
+                if name in texts:
+                    return texts[name]
+                if name in present:
+                    return ""
+            elif elem.xpath(f"{name}/text()") or elem.xpath(name):
+                return self._xml_text(elem, [name])
+        return ""
+
     def check_xml_columns(self, elements: list) -> None:
         """
         Validate the tag structure of an XML price list.
@@ -833,8 +946,9 @@ class BaseCrawler:
     def parse_xml_product(self, elem: Any) -> Product:
         # Heterogeneous by design: prices, strings and flags all feed Product()
         data: dict[str, Any] = {}
+        children = self._xml_children(elem)
         for field, names, _keys, is_required in self._price_specs:
-            value = self._xml_text(elem, names)
+            value = self._xml_field(elem, children, names)
             try:
                 data[field] = self.parse_price(value, is_required)
             except ValueError as err:
@@ -846,7 +960,7 @@ class BaseCrawler:
                 raise
 
         for field, names, _keys, is_required in self._field_specs:
-            value = self._xml_text(elem, names)
+            value = self._xml_field(elem, children, names)
             if not value and is_required:
                 tagname = "/".join(names) or field
                 raise ValueError(
@@ -855,7 +969,7 @@ class BaseCrawler:
             data[field] = value
 
         for field, names, _keys, is_required in self._bool_specs:
-            flag = self.parse_bool(self._xml_text(elem, names))
+            flag = self.parse_bool(self._xml_field(elem, children, names))
             if flag is None and is_required:
                 raise ValueError(f"Missing required field: {field}")
             data[field] = flag

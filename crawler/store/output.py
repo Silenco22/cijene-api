@@ -122,7 +122,17 @@ def normalize_whitespace(value: str) -> str:
     Returns:
         String with normalized whitespace
     """
-    return re.sub(r"\s+", " ", value)
+    # Fork change (2026-11-18): every cell of every price row comes through
+    # here, mostly prices, and the regex was 18% of a CSV chain's crawl time.
+    # Python counts every whitespace character but the ASCII space as not
+    # printable, so a printable value without two spaces in a row is already
+    # normalized (checked for every code point on 3.13).
+    if value.isprintable() and "  " not in value:
+        return value
+    return _WHITESPACE_RUN.sub(" ", value)
+
+
+_WHITESPACE_RUN = re.compile(r"\s+")
 
 
 def save_csv(path: Path, data: list[dict], columns: list[str]):

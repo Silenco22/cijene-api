@@ -7,7 +7,7 @@ from shutil import rmtree
 from time import time
 from typing import List
 
-from crawler.store.base import CrawlerBlocked
+from crawler.store.base import CrawlerBlocked, CrawlerFormatChanged
 from crawler.store.boso import BosoCrawler
 from crawler.store.branka import BrankaCrawler
 from crawler.store.brodokomerc import BrodokomercCrawler
@@ -115,6 +115,13 @@ def crawl_chain(chain: str, date: datetime.date, path: Path) -> CrawlResult:
     # write nothing.
     try:
         stats = save_chain(path, crawler.iter_all_products(date))
+    except CrawlerFormatChanged as err:
+        logger.error(
+            f"{chain} price lists for {date:%Y-%m-%d} are in a format the crawler "
+            f"does not read, discarding the run: {err}"
+        )
+        rmtree(path, ignore_errors=True)
+        return CrawlResult()
     except CrawlerBlocked as err:
         logger.error(
             f"Blocked while crawling {chain} for {date:%Y-%m-%d}, "
@@ -128,6 +135,15 @@ def crawl_chain(chain: str, date: datetime.date, path: Path) -> CrawlResult:
         )
         rmtree(path, ignore_errors=True)
         return CrawlResult()
+
+    if crawler.format_changed:
+        # A crawler that skips a failed store also skipped the
+        # CrawlerFormatChanged raised for it; no further list was fetched.
+        logger.error(
+            f"{chain} price lists for {date:%Y-%m-%d} are in a format the crawler "
+            f"does not read: the first {crawler.FORMAT_FAILURE_LIMIT} all "
+            f"lacked a required column"
+        )
 
     if crawler.blocked:
         logger.error(
