@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import time
-from typing import Any, Optional
+from typing import Optional
 
 from bs4 import BeautifulSoup, Tag
 
@@ -41,17 +41,10 @@ class BosoCrawler(BaseCrawler):
 
     ANCHOR_PRICE_DATE = datetime.date(2025, 5, 2)
 
-    # Fork change (2026-11-18): since that day the lists have "bazna cijena"
-    # instead of "sidrena cijena na 2.5.2025", one price column (MPC) and a 0/1
-    # "posebni oblik prodaje" flag, and no special price, 30-day low,
-    # availability, category or sale name. Checked against our 2026-11-17 rows
-    # of one store (2,373 products in both): bazna cijena equals the old anchor
-    # price for all 2,373 (73 of them 0, where none was published); on flagged
-    # rows MPC equals the old special price for 399 of 432 (the other 33 were
-    # not on sale the day before); on the others it equals the old MPC for
-    # 1,941 of 1,941. The header states no date, so these anchor prices get
-    # none (as Konzum's).
-    NEW_ANCHOR_PRICE_COLUMN = "bazna cijena"
+    # Since 2026-11-18 the anchor price column is "bazna cijena" (NN 132/2026).
+    # Its values match the 2.5.2025 anchor prices, but the header states no
+    # date and the reference date differs per product, so these rows get none.
+    BASE_PRICE_COLUMN = "bazna cijena"
 
     PRICE_MAP = {
         "price": ("MPC", False),
@@ -60,7 +53,7 @@ class BosoCrawler(BaseCrawler):
         # Boso abbreviates "posljednih" — the column was missed until 2026-09-04.
         "best_price_30": ("Najniža cijena u poslj. 30 dana", False),
         "anchor_price": ("sidrena cijena na 2.5.2025", False),
-        "new_anchor_price": (NEW_ANCHOR_PRICE_COLUMN, False),
+        "base_price": (BASE_PRICE_COLUMN, False),
     }
 
     FIELD_MAP = {
@@ -82,7 +75,7 @@ class BosoCrawler(BaseCrawler):
     REQUIRED_COLUMNS = [
         "MPC",
         "cijena za jedinicu mjere",
-        ("sidrena cijena na 2.5.2025", NEW_ANCHOR_PRICE_COLUMN),
+        ("sidrena cijena na 2.5.2025", BASE_PRICE_COLUMN),
         "šifra",
         "naziv",
         "marka",
@@ -92,7 +85,8 @@ class BosoCrawler(BaseCrawler):
 
     # Both trailing columns were added on 2026-09-23 for NN 101/2026; the rest
     # of the header was left alone. Availability is published as 1/0 here.
-    # The flag came with the 2026-11-18 format, which drops the four before it.
+    # The files of 2026-11-18 dropped the special price, availability and the
+    # sale name, and added "posebni oblik prodaje" (1/0).
     OPTIONAL_COLUMNS = [
         "neto količina",
         "kategorija proizvoda",
@@ -110,19 +104,22 @@ class BosoCrawler(BaseCrawler):
         self._ajax_config = None
         self._price_list_page: str | None = None
 
-    def fix_product_data(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Read the 2026-11-18 format into the same row as the old one."""
-        new_anchor_price = data.pop("new_anchor_price", None)
+    def fix_product_data(self, data: dict) -> dict:
+        base_price = data.pop("base_price", None)
         on_special = data.pop("on_special", None)
         data = super().fix_product_data(data)
 
-        # 0 means no price here as everywhere (see BaseCrawler.fix_product_data)
-        if data.get("anchor_price") is None and new_anchor_price:
-            data["anchor_price"] = new_anchor_price
+        # A base price of 0 means none is published, as for the other prices
+        if data.get("anchor_price") is None and base_price:
+            data["anchor_price"] = base_price
             data["anchor_price_date"] = None
 
-        # On a flagged row the one published price is the sale price. Only the
-        # new flag: an old-format row keeps exactly what it published.
+        # Since 2026-11-18 the chain publishes one price column plus a 1/0
+        # flag, without a separate special price or the name of the sale. On
+        # sale rows the published price is the sale price: in one store's
+        # file, 142 products that were at the regular price on 2026-11-17 are
+        # flagged and cheaper, and 200 that were on sale are unflagged and
+        # dearer. The regular price is no longer published.
         if on_special and data.get("special_price") is None:
             data["special_price"] = data["price"]
 
