@@ -84,6 +84,7 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
     INDEX_URL = "https://jadranka-trgovina.com/cjenici/"
 
     FILENAME_DATE_PATTERN = re.compile(r"_(\d{2})(\d{2})(\d{4})_\d{4}\.csv$")
+    OIB_PREFIX = re.compile(r"^\d{11}_")
 
     # First day whose file names have a file ID after the store ID.
     FILE_ID_SINCE = datetime.date(2026, 11, 17)
@@ -93,6 +94,9 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
 
     OLD_ANCHOR_PRICE_COLUMN = "SIDRENA CIJENA NA 2.5.2025"
     NEW_ANCHOR_PRICE_COLUMN = "SIDRENA CIJENA"
+    # Since 2026-11-20 the anchor is "BAZNA CIJENA" (same values as the
+    # 2026-11-19 SIDRENA CIJENA), also without a date in the header.
+    BASE_PRICE_COLUMN = "BAZNA CIJENA"
 
     # Since 2026-11-17 the only price column is "MPC ZA VRIJEME POSEBNOG
     # OBLIKA PRODAJE". It is filled on every row and holds the shelf price,
@@ -100,28 +104,42 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
     PRICE_COLUMN = "MALOPRODAJNA CIJENA"
     SPECIAL_PRICE_COLUMN = "MPC ZA VRIJEME POSEBNOG OBLIKA PRODAJE"
 
+    # Since 2026-11-20 the only price column is "MPC", with a
+    # "POSEBAN OBLIK PRODAJE" column naming the form of sale ("Akcija") on
+    # sale rows. On those rows MPC is the sale price (checked against
+    # 2026-11-19: MPC equals the price published then on all of them).
+    NEW_PRICE_COLUMN = "MPC"
+    SALE_TYPE_COLUMN = "POSEBAN OBLIK PRODAJE"
+
+    # The 2026-11-20 files split the barcode into "EAN KOD" and "BAR KOD" (an
+    # internal code). The old BARKOD was the EAN where there is one and the
+    # internal code otherwise, so the two are merged the same way.
+    EAN_COLUMN = "EAN KOD"
+    INTERNAL_CODE_COLUMN = "BAR KOD"
+
     PRICE_MAP = {
         # field: (column_name, is_required)
         # Note: Many products have empty retail price but filled special price
         # Some products also have empty unit_price
-        "price": (PRICE_COLUMN, False),
-        "unit_price": ("CIJENA ZA JEDINICU MJERE", False),
+        "price": ((PRICE_COLUMN, NEW_PRICE_COLUMN), False),
+        "unit_price": (("CIJENA ZA JEDINICU MJERE", "CIJENA ZA JM"), False),
         "special_price": (SPECIAL_PRICE_COLUMN, False),
         "best_price_30": ("NAJNIŽA CIJENA U POSLJEDNIH 30 DANA", False),
         "anchor_price": (
-            (OLD_ANCHOR_PRICE_COLUMN, NEW_ANCHOR_PRICE_COLUMN),
+            (OLD_ANCHOR_PRICE_COLUMN, NEW_ANCHOR_PRICE_COLUMN, BASE_PRICE_COLUMN),
             False,
         ),
     }
 
     FIELD_MAP = {
-        "product_id": ("ŠIFRA PROIZVODA", True),
-        "product": ("NAZIV PROIZVODA", True),
-        "brand": ("MARKA PROIZVODA", False),
+        "product_id": (("ŠIFRA PROIZVODA", "SIFRA ROBE"), True),
+        "product": (("NAZIV PROIZVODA", "NAZIV ROBE"), True),
+        "brand": (("MARKA PROIZVODA", "MARKA"), False),
         "barcode": ("BARKOD", False),
         "category": ("KATEGORIJA PROIZVODA", False),
-        "quantity": ("NETO KOLIČINA", False),
+        "quantity": (("NETO KOLIČINA", "NETO KOLICINA"), False),
         "unit": ("JEDINICA MJERE", False),
+        "special_sale_type": (SALE_TYPE_COLUMN, False),
     }
 
     BOOL_MAP = {
@@ -129,20 +147,20 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
     }
 
     REQUIRED_COLUMNS = [
-        (PRICE_COLUMN, SPECIAL_PRICE_COLUMN),
-        "CIJENA ZA JEDINICU MJERE",
-        (OLD_ANCHOR_PRICE_COLUMN, NEW_ANCHOR_PRICE_COLUMN),
-        "ŠIFRA PROIZVODA",
-        "NAZIV PROIZVODA",
-        "MARKA PROIZVODA",
-        "BARKOD",
+        (PRICE_COLUMN, SPECIAL_PRICE_COLUMN, NEW_PRICE_COLUMN),
+        ("CIJENA ZA JEDINICU MJERE", "CIJENA ZA JM"),
+        (OLD_ANCHOR_PRICE_COLUMN, NEW_ANCHOR_PRICE_COLUMN, BASE_PRICE_COLUMN),
+        ("ŠIFRA PROIZVODA", "SIFRA ROBE"),
+        ("NAZIV PROIZVODA", "NAZIV ROBE"),
+        ("MARKA PROIZVODA", "MARKA"),
+        ("BARKOD", EAN_COLUMN, INTERNAL_CODE_COLUMN),
         "JEDINICA MJERE",
     ]
 
     # The first four aren't required by NN 101/2026, so the chain may drop
     # them. DOSTUPNOST was added on 2026-11-17; older files don't have it.
     OPTIONAL_COLUMNS = [
-        "NETO KOLIČINA",
+        ("NETO KOLIČINA", "NETO KOLICINA"),
         "KATEGORIJA PROIZVODA",
         SPECIAL_PRICE_COLUMN,
         "NAJNIŽA CIJENA U POSLJEDNIH 30 DANA",
@@ -219,6 +237,10 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
             a shop
         """
         filename = csv_url.rsplit("/", 1)[-1]
+        # Since 2026-11-20 some names (Market Maxi, the web shop, the café)
+        # start with the company OIB and have "ROBA" before the file ID:
+        # 02198337590_MARKET_MAXI_DRAZICA5_MALILOSINJ_607_ROBA_221_20112026_0800.csv
+        filename = self.OIB_PREFIX.sub("", filename)
         prefix = next((t for t in STORE_TYPES if filename.startswith(f"{t}_")), None)
         if prefix is None:
             if not filename.startswith(SKIPPED_TYPES):
@@ -230,6 +252,8 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
         # and the one before that the city. Store IDs are numbers, except the
         # web shop's "WEB", so the file date tells the two formats apart.
         tokens = filename.removesuffix(".csv").split("_")
+        if len(tokens) > 4 and tokens[-4] == "ROBA":
+            del tokens[-4]
         file_date = datetime.datetime.strptime(tokens[-2], "%d%m%Y").date()
         idx = len(tokens) - (4 if file_date >= self.FILE_ID_SINCE else 3)
         store_id = tokens[idx]
@@ -262,6 +286,11 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
         # other columns don't shift.
         lines = content.splitlines()
         if lines:
+            # Since 2026-11-20 the header ends with a delimiter and the rows
+            # don't. Drop it, or a row with the delimiter in its name has the
+            # header's width and isn't repaired.
+            if lines[0].rstrip().endswith(delimiter):
+                lines[0] = lines[0].rstrip()[: -len(delimiter)]
             width = lines[0].count(delimiter)
             for i, line in enumerate(lines[1:], start=1):
                 extra = line.count(delimiter) - width
@@ -274,17 +303,31 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
         return super().parse_csv(content, delimiter)
 
     def parse_csv_row(self, row: dict) -> Product:
-        if self.PRICE_COLUMN not in row:
-            row[self.PRICE_COLUMN] = row.pop(self.SPECIAL_PRICE_COLUMN, "")
+        if self.PRICE_COLUMN not in row and self.SPECIAL_PRICE_COLUMN in row:
+            row[self.PRICE_COLUMN] = row.pop(self.SPECIAL_PRICE_COLUMN)
+
+        if "BARKOD" not in row:
+            ean = (row.get(self.EAN_COLUMN) or "").strip()
+            row["BARKOD"] = ean or (row.get(self.INTERNAL_CODE_COLUMN) or "").strip()
 
         product = super().parse_csv_row(row)
 
-        # The new anchor header states no date, so ANCHOR_PRICE_DATE doesn't
-        # apply to it.
-        if self.NEW_ANCHOR_PRICE_COLUMN in row:
+        # The newer anchor headers state no date, so ANCHOR_PRICE_DATE doesn't
+        # apply to them.
+        if self.NEW_ANCHOR_PRICE_COLUMN in row or self.BASE_PRICE_COLUMN in row:
             product.anchor_price_date = None
 
         return product
+
+    def fix_product_data(self, data: dict) -> dict:
+        data = super().fix_product_data(data)
+
+        # A named form of sale marks MPC as the sale price, the same rule as
+        # Konzum's: the regular price isn't published on those rows.
+        if data.get("special_sale_type") and data.get("special_price") is None:
+            data["special_price"] = data["price"]
+
+        return data
 
     def get_store_prices(self, csv_url: str) -> list[Product]:
         """

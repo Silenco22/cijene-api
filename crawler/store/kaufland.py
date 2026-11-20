@@ -113,6 +113,7 @@ class KauflandCrawler(BaseCrawler):
 
     # Pattern to parse store information from filename
     # Format: Supermarket_Put_Gaceleza_1D_Vodice_6730_15_05_2025_7_30.csv
+    # Since 2026-11-20: 47432874968_Supermarket_Put_Gaceleza_1D_Vodice_6730_cjenik robe_1_20261120_0730.csv
     ADDRESS_PATTERN = re.compile(r"(Supermarket|Hipermarket)_(.+?)_(\d{4})_")
 
     def get_index(self, date: datetime.date) -> dict[str, str]:
@@ -155,15 +156,21 @@ class KauflandCrawler(BaseCrawler):
         # 4. Parse the JSON data to extract CSV URLs
         json_data = loads(json_content)
 
+        # Since 2026-11-20 the labels have an OIB prefix and a YYYYMMDD date,
+        # e.g. "47432874968_Hipermarket_Andrije_Hebranga_2_Zadar_2030_cjenik
+        # robe_1_20261120_0730.csv"; before that "..._Zadar_2030_19112026_7-30.csv".
         urls = {}
-        date_str = date.strftime("_%d_%m_%Y_")
-        date_str2 = date.strftime("_%d%m%Y_")
+        date_strs = (
+            date.strftime("_%d_%m_%Y_"),
+            date.strftime("_%d%m%Y_"),
+            date.strftime("_%Y%m%d_"),
+        )
         for item in json_data:
             label = item.get("label")
             url = item.get("path")
             if not label or not url:
                 continue
-            if date_str not in label and date_str2 not in label:
+            if not any(date_str in label for date_str in date_strs):
                 continue
             urls[label] = f"{self.BASE_URL}{url}"
 
