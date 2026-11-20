@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import time
-from typing import Optional
+from typing import Iterator, Optional
 
 from bs4 import BeautifulSoup, Tag
 
@@ -342,14 +342,22 @@ class BosoCrawler(BaseCrawler):
         return csv_links
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
+        return list(self.iter_all_products(date))
+
+    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
         """
         Main method to fetch and parse all products from Boso's price lists.
+
+        Fork change (2026-11-20): a generator yielding one store at a time, so
+        only one store's ~3.4k products are in memory instead of the whole day
+        (~970k products, ~1.9 GB). Boso crawls in the background beside the
+        other chains (run_pipeline.sh), so its memory overlaps theirs.
 
         Args:
             date: The date for which to fetch the price list
 
-        Returns:
-            List of Store objects, each containing its products.
+        Yields:
+            Store objects, each containing its products.
 
         Raises:
             ValueError: If stores cannot be fetched or parsed
@@ -362,7 +370,7 @@ class BosoCrawler(BaseCrawler):
 
         logger.info(f"Processing {len(stores_info)} stores for date {date}")
 
-        stores = []
+        n_stores = 0
 
         for store_value, store_info in stores_info.items():
             try:
@@ -408,14 +416,16 @@ class BosoCrawler(BaseCrawler):
                         continue
 
                 if store.items:
-                    stores.append(store)
+                    n_stores += 1
+                    yield store
                     logger.debug(
                         f"Added store {store.name} with {len(store.items)} products"
                     )
 
             except CrawlerBlocked as e:
                 if store.items:
-                    stores.append(store)
+                    n_stores += 1
+                    yield store
                 logger.error(f"Stopping the Boso crawl: {e}")
                 break
             except Exception as e:
@@ -425,8 +435,7 @@ class BosoCrawler(BaseCrawler):
                 )
                 continue
 
-        logger.info(f"Successfully processed {len(stores)} stores")
-        return stores
+        logger.info(f"Successfully processed {n_stores} stores")
 
 
 if __name__ == "__main__":
