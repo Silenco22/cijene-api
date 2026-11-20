@@ -347,6 +347,15 @@ class BaseCrawler:
             logger.warning(f"{self.CHAIN}: unknown boolean value {value!r}")
         return None
 
+    def request_delay(self, url: str) -> float:
+        """
+        The pacing delay before a request to this URL, REQUEST_DELAY by default.
+
+        Fork addition (2026-11-20): Boso overrides it, because its host limits
+        only the AJAX listing, not the CSV files themselves.
+        """
+        return self.REQUEST_DELAY
+
     def _throttle(self, url: str) -> None:
         """
         Wait until this host may be requested again.
@@ -365,8 +374,9 @@ class BaseCrawler:
         ready = now
 
         last = self._last_request.get(host)
-        if last is not None and self.REQUEST_DELAY > 0:
-            ready = max(ready, last + self.REQUEST_DELAY)
+        delay = self.request_delay(url)
+        if last is not None and delay > 0:
+            ready = max(ready, last + delay)
 
         cooldown = self._cooldown.get(host)
         if cooldown is not None:

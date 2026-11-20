@@ -4,6 +4,7 @@ import logging
 import re
 import time
 from typing import Iterator, Optional
+from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
@@ -37,7 +38,15 @@ class BosoCrawler(BaseCrawler):
     started within the next hour got nothing. The window length is not known;
     7s stays under 10 requests per minute. On 2026-11-14 a pass made 30
     requests in 203s with no 429.
+
+    Only the AJAX listing (admin-ajax.php) is limited, so request_delay
+    applies this to it alone. On 2026-11-20, 20 CSV downloads from
+    /wp-content/uploads/ back to back all returned 200 in 0.6s, and 15 stores
+    with only the listing paced took 106s over 30 requests with no 429
+    (~33 min for 283 stores instead of ~66).
     """
+
+    STATIC_PATH_PREFIX = "/wp-content/uploads/"
 
     ANCHOR_PRICE_DATE = datetime.date(2025, 5, 2)
 
@@ -103,6 +112,12 @@ class BosoCrawler(BaseCrawler):
         super().__init__()
         self._ajax_config = None
         self._price_list_page: str | None = None
+
+    def request_delay(self, url: str) -> float:
+        """No pacing for the price list files: only the AJAX listing is limited."""
+        if urlsplit(url).path.startswith(self.STATIC_PATH_PREFIX):
+            return 0.0
+        return self.REQUEST_DELAY
 
     def fix_product_data(self, data: dict) -> dict:
         base_price = data.pop("base_price", None)
