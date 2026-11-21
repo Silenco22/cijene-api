@@ -251,9 +251,12 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
         # file ID was missing, so the token before the date was the store ID
         # and the one before that the city. Store IDs are numbers, except the
         # web shop's "WEB", so the file date tells the two formats apart.
-        tokens = filename.removesuffix(".csv").split("_")
-        if len(tokens) > 4 and tokens[-4] == "ROBA":
-            del tokens[-4]
+        # Since 2026-11-21 about half the names have a double underscore after
+        # ROBA (..._558_ROBA__237_21112026_0800.csv); the empty token it
+        # leaves took the store ID's place, so empty tokens and ROBA go.
+        tokens = [
+            t for t in filename.removesuffix(".csv").split("_") if t and t != "ROBA"
+        ]
         file_date = datetime.datetime.strptime(tokens[-2], "%d%m%Y").date()
         idx = len(tokens) - (4 if file_date >= self.FILE_ID_SINCE else 3)
         store_id = tokens[idx]
