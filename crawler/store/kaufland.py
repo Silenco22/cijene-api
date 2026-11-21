@@ -72,6 +72,7 @@ class KauflandCrawler(BaseCrawler):
 
     CITIES = [
         "Zagreb Blato",
+        "Zagreb Sesvete",
         "Zagreb",
         "Karlovac",
         "Velika Gorica",
@@ -109,11 +110,12 @@ class KauflandCrawler(BaseCrawler):
         "Vodice",
         "Varazdin",
         "Samobor",
+        "Krk",
+        "Lucko",
     ]
 
     # Pattern to parse store information from filename
     # Format: Supermarket_Put_Gaceleza_1D_Vodice_6730_15_05_2025_7_30.csv
-    # Since 2026-11-20: 47432874968_Supermarket_Put_Gaceleza_1D_Vodice_6730_cjenik robe_1_20261120_0730.csv
     ADDRESS_PATTERN = re.compile(r"(Supermarket|Hipermarket)_(.+?)_(\d{4})_")
 
     def get_index(self, date: datetime.date) -> dict[str, str]:
@@ -156,15 +158,18 @@ class KauflandCrawler(BaseCrawler):
         # 4. Parse the JSON data to extract CSV URLs
         json_data = loads(json_content)
 
-        # Since 2026-11-20 the labels have an OIB prefix and a YYYYMMDD date,
-        # e.g. "47432874968_Hipermarket_Andrije_Hebranga_2_Zadar_2030_cjenik
-        # robe_1_20261120_0730.csv"; before that "..._Zadar_2030_19112026_7-30.csv".
-        urls = {}
+        # Until 2026-11-19 the file names had the date as "_DD_MM_YYYY_" or
+        # "_DDMMYYYY_", e.g. "Hipermarket_114__Brigade_6_Split_1630_19112026_7-30.csv".
+        # Since then they have the chain's OIB in front and the date as
+        # "_YYYYMMDD_", e.g. "47432874968_Hipermarket_114__Brigade_6_Split_1630_
+        # cjenik robe_1_20261120_0730.csv".
         date_strs = (
             date.strftime("_%d_%m_%Y_"),
             date.strftime("_%d%m%Y_"),
             date.strftime("_%Y%m%d_"),
         )
+
+        urls = {}
         for item in json_data:
             label = item.get("label")
             url = item.get("path")
@@ -186,7 +191,9 @@ class KauflandCrawler(BaseCrawler):
         Returns:
             Store object with parsed information
         """
-        # Format example: Supermarket_Put_Gaceleza_1D_Vodice_6730_15_05_2025_7_30.csv
+        # Format examples:
+        #   Supermarket_Put_Gaceleza_1D_Vodice_6730_15_05_2025_7_30.csv
+        #   47432874968_Hipermarket_114__Brigade_6_Split_1630_cjenik robe_1_20261120_0730.csv
         match = self.ADDRESS_PATTERN.search(title)
         if not match:
             raise ValueError(f"Could not parse store info from filename: {title}")
@@ -253,6 +260,12 @@ class KauflandCrawler(BaseCrawler):
         return super().parse_csv(content, delimiter)
 
     def parse_csv_row(self, row: dict) -> Product:
+        # The 30-day lowest price field overflows from 100 EUR up and keeps
+        # only the last digits after a "*", e.g. "*9,00" on a 289,00 EUR item
+        # and "*4,00" on a 104,00 EUR one. The real value can't be recovered.
+        if (row.get("Najniža MPC u 30dana") or "").strip().startswith("*"):
+            row["Najniža MPC u 30dana"] = ""
+
         # "Sidrena cijena" (anchor price) contains an encoded date + price.
         # Variants seen in the wild:
         #   "MPC 2.5.2025=7,99€"      — standard format
@@ -301,10 +314,15 @@ class KauflandCrawler(BaseCrawler):
         """
         csv_links = self.get_index(date)
         stores = []
+        store_ids = set()
 
         for title, url in csv_links.items():
             try:
                 store = self.parse_store_info(title)
+                # On 2026-11-19 most stores have a file in both name formats.
+                if store.store_id in store_ids:
+                    logger.info(f"Skipping second price list for store: {title}")
+                    continue
                 products = self.get_store_prices(url)
             except Exception as e:
                 logger.error(f"Error processing store from {url}: {e}", exc_info=True)
@@ -316,6 +334,7 @@ class KauflandCrawler(BaseCrawler):
 
             store.items = products
             stores.append(store)
+            store_ids.add(store.store_id)
 
         return stores
 
