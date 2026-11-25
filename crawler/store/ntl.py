@@ -37,6 +37,18 @@ class NtlCrawler(BaseCrawler):
         r"_(\d{8})_\d{2}_\d{2}_\d{2}\.csv$", re.IGNORECASE
     )
 
+    # Since 2026-11-24 the names start with the chain's OIB, carry "cjenik_robe"
+    # and a counter after the store ID, and end in YYYYMMDD_HHMM:
+    # 78344221376_Minimarket_K.TOMISLAVA 188_BELISCE_20508_cjenik_robe_31000_20261124_0428.csv
+    # Store type, address, city and store ID are the same as in the old names.
+    NEW_STORE_FILENAME_PATTERN = re.compile(
+        r"\d{11}_(?P<store_type>[^_]+)_(?P<street_address>.+)_(?P<city>[^_]+)_(?P<store_id>\d+)_cjenik_robe_\d+_\d{8}_\d{4}\.csv$",
+        re.IGNORECASE,
+    )
+    NEW_FILENAME_DATE_PATTERN = re.compile(
+        r"_cjenik_robe_\d+_(\d{8})_\d{4}\.csv$", re.IGNORECASE
+    )
+
     # The index keeps the last 30 days, as the page itself states.
     RETENTION_DAYS = 30
 
@@ -51,7 +63,11 @@ class NtlCrawler(BaseCrawler):
         # Gavranović and Trgovina Krk spell it out; the values themselves are
         # still mostly the 2.5.2025 anchor, so neither spelling tells us which
         # reference date a given row refers to.
-        "anchor_price": (["Sidrena cijena na 2.5.2025", "Sidrena cijena"], False),
+        # Renamed again to "Bazna cijena" on 2026-11-24 (NN 132/2026).
+        "anchor_price": (
+            ["Sidrena cijena na 2.5.2025", "Sidrena cijena", "Bazna cijena"],
+            False,
+        ),
     }
 
     # Mapping for other product fields from CSV columns
@@ -73,7 +89,7 @@ class NtlCrawler(BaseCrawler):
     REQUIRED_COLUMNS = [
         "Maloprodajna cijena",
         "Cijena za jedinicu mjere",
-        ["Sidrena cijena na 2.5.2025", "Sidrena cijena"],
+        ["Sidrena cijena na 2.5.2025", "Sidrena cijena", "Bazna cijena"],
         "Šifra proizvoda",
         "Barkod",
         "Naziv proizvoda",
@@ -118,14 +134,22 @@ class NtlCrawler(BaseCrawler):
 
         The date is the second-to-last group before the time, e.g.
         Supermarket_Ljudevita Gaja 1_DUGA RESA_10103_263_25052025_07_22_36.csv
-        is 25.05.2025. Returns None if the filename doesn't carry a usable date.
+        is 25.05.2025. Names in the format used since 2026-11-24 carry YYYYMMDD
+        instead. Returns None if the filename doesn't carry a usable date.
         """
-        match = self.FILENAME_DATE_PATTERN.search(unquote(os.path.basename(url)))
-        if not match:
+        filename = unquote(os.path.basename(url))
+        for pattern, date_format in (
+            (self.NEW_FILENAME_DATE_PATTERN, "%Y%m%d"),
+            (self.FILENAME_DATE_PATTERN, "%d%m%Y"),
+        ):
+            match = pattern.search(filename)
+            if match:
+                break
+        else:
             return None
 
         try:
-            return datetime.datetime.strptime(match.group(1), "%d%m%Y").date()
+            return datetime.datetime.strptime(match.group(1), date_format).date()
         except ValueError:
             return None
 
@@ -146,7 +170,9 @@ class NtlCrawler(BaseCrawler):
 
         filename = unquote(os.path.basename(url))
 
-        match = self.STORE_FILENAME_PATTERN.match(filename)
+        match = self.NEW_STORE_FILENAME_PATTERN.match(
+            filename
+        ) or self.STORE_FILENAME_PATTERN.match(filename)
         if not match:
             raise ValueError(f"Invalid CSV filename format for NTL: {filename}")
 
