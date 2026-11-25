@@ -81,6 +81,8 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
     Since 2026-11-20 Market Maxi, the web shop and a café have the chain's OIB
     in front of the file name and "ROBA" (goods) after the store ID:
     02198337590_MARKET_MAXI_DRAZICA5_MALILOSINJ_607_ROBA_221_20112026_0800.csv.
+    Since 2026-11-21 all shops use that form, about half with "ROBA__":
+    02198337590_MARKET_PRIKO_PRIKO46_MALILOSINJ_558_ROBA__291_23112026_0800.csv.
     """
 
     CHAIN = "jadranka_trgovina"
@@ -251,14 +253,12 @@ class JadrankaTrgovinaCrawler(BaseCrawler):
         # and the one before that the city. Store IDs are numbers, except the
         # web shop's "WEB", so the file date tells the two formats apart.
         # Since 2026-11-20 some names have "ROBA" between store and file ID,
-        # and since 2026-11-21 about half have a double underscore after it
-        # (..._558_ROBA__237_21112026_0800.csv), whose empty token took the
-        # store ID's place. Empty tokens and ROBA are dropped.
-        tokens = [
-            t for t in basename.removesuffix(".csv").split("_") if t and t != "ROBA"
-        ]
+        # and since 2026-11-21 some of those have "__" after it ("ROBA__291").
+        tokens = [t for t in basename.removesuffix(".csv").split("_") if t]
         file_date = datetime.datetime.strptime(tokens[-2], "%d%m%Y").date()
         idx = len(tokens) - (4 if file_date >= self.FILE_ID_SINCE else 3)
+        if tokens[idx] == "ROBA":
+            idx -= 1
         store_id = tokens[idx]
 
         if store_id in STORES:

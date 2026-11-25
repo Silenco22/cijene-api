@@ -379,9 +379,28 @@ class TrgocentarCrawler(BaseCrawler):
 
         return matching_urls
 
+    def get_file_version(self, filename: str) -> tuple[str, int]:
+        """
+        Get the time and serial from the name of a file in the daily ZIP.
+
+        Args:
+            filename: Name of the XML file
+
+        Returns:
+            (HHMM, serial) tuple, or ("", 0) if the name doesn't match
+        """
+        match = self.NEW_FILENAME_PATTERN.match(os.path.basename(filename))
+        if not match:
+            return ("", 0)
+        return (match.group("time"), int(match.group("serial")))
+
     def get_zip_stores(self, zip_url: str) -> list[Store]:
         """
         Download the daily ZIP and parse the XML file of each store in it.
+
+        A store can have more than one file in the ZIP: on 2026-11-23, 9 of
+        95 stores were exported twice, 14 minutes apart, with the serial
+        incremented. The file with the latest time (then serial) wins.
 
         Args:
             zip_url: URL of the daily ZIP
@@ -390,11 +409,21 @@ class TrgocentarCrawler(BaseCrawler):
             List of Store objects with their products.
         """
         logger.info(f"Fetching Trgocentar ZIP: {zip_url}")
-        stores = []
+        # store_id -> (file version, file name, store)
+        latest: dict[str, tuple[tuple[str, int], str, Store]] = {}
 
         for filename, xml_content in self.get_zip_contents(zip_url, ".xml"):
             try:
                 store = self.parse_store_info(filename)
+                version = self.get_file_version(filename)
+                previous = latest.get(store.store_id)
+                if previous and previous[0] >= version:
+                    logger.info(
+                        f"Trgocentar store {store.store_id}: skipping {filename}, "
+                        f"using the later {previous[1]}"
+                    )
+                    continue
+
                 store.items = self.parse_xml(xml_content)
             except Exception as e:
                 logger.error(
@@ -407,9 +436,14 @@ class TrgocentarCrawler(BaseCrawler):
                 logger.warning(f"No products found for Trgocentar store {filename}")
                 continue
 
-            stores.append(store)
+            if previous:
+                logger.info(
+                    f"Trgocentar store {store.store_id}: skipping {previous[1]}, "
+                    f"using the later {filename}"
+                )
+            latest[store.store_id] = (version, filename, store)
 
-        return stores
+        return [store for _, _, store in latest.values()]
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
         """
