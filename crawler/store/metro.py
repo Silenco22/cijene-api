@@ -38,7 +38,10 @@ class MetroCrawler(BaseCrawler):
         "unit_price": ("CIJENA_PO_MJERI", True),
         "special_price": ("POSEBNA_PRODAJA", False),
         "best_price_30": ("NAJNIZA_30_DANA", False),
-        "anchor_price": ("SIDRENA_02_05", False),
+        # Renamed (NN 132/2026): the 2026-11-25 re-upload says BAZNA, the
+        # 2026-11-26 lists say BAZNA_CIJENA. Unlike the other chains, Metro's
+        # values are its prices on ~10.9.2026, not on 2.5.2025.
+        "anchor_price": (["SIDRENA_02_05", "BAZNA_CIJENA", "BAZNA"], False),
     }
 
     # Mapping for other product fields from CSV columns
@@ -55,7 +58,7 @@ class MetroCrawler(BaseCrawler):
     REQUIRED_COLUMNS = [
         "MPC",
         "CIJENA_PO_MJERI",
-        "SIDRENA_02_05",
+        ["SIDRENA_02_05", "BAZNA_CIJENA", "BAZNA"],
         "NAZIV",
         "SIFRA",
         "MARKA",
