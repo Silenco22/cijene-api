@@ -2,6 +2,7 @@ import datetime
 import logging
 import re
 from csv import DictReader
+from typing import Generator
 from urllib.parse import unquote, urljoin
 
 from bs4 import BeautifulSoup
@@ -171,13 +172,12 @@ class BipaCrawler(BaseCrawler):
 
         return data
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         store_urls = self.get_store_urls(date)
         if not store_urls:
             logger.info(f"No Bipa price list for {date}")
-            return []
+            return
 
-        stores = []
         stores_never_available = 0
         for store_id, url in sorted(store_urls.items()):
             kept_before = self._kept_never_available
@@ -195,7 +195,7 @@ class BipaCrawler(BaseCrawler):
 
             store = self.get_mapped_store(store_id, f"Bipa {store_id}")
             store.items = products
-            stores.append(store)
+            yield store
 
         logger.info(
             f"Bipa: skipped {self._skipped_zero_price} rows with price 0 "
@@ -210,8 +210,6 @@ class BipaCrawler(BaseCrawler):
                 f"{self.NEVER_AVAILABLE_BRAND} rows because the brand was never "
                 "available; check whether that still holds."
             )
-
-        return stores
 
 
 if __name__ == "__main__":
