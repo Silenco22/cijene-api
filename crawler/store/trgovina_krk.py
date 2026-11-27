@@ -2,8 +2,9 @@ import datetime
 import logging
 import re
 from typing import Any, Dict, List, Optional
+from urllib.parse import unquote
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 from crawler.store.models import Store
 
@@ -23,6 +24,25 @@ class TrgovinaKrkCrawler(BaseCrawler):
     CHAIN = "trgovina-krk"
     BASE_URL = "https://trgovina-krk.hr"
     INDEX_URL = "https://trgovina-krk.hr/objava-cjenika/"
+
+    # Since 2026-11-11 the index lists all ~780 stores of the chain, not only
+    # the supermarkets. Only these store types are crawled.
+    STORE_TYPES = {"Supermarket", "Minimarket", "Klasicna prodavaonica"}
+
+    # Left out on purpose: specialized stores (some sell building materials)
+    # and gas station shops. Any other type gets a warning.
+    SKIPPED_STORE_TYPES = {
+        "Specijalizirana prodavaonica",
+        "Benzinska postaja i prodavaonica",
+    }
+
+    # "[OIB_]<type>_<address>_<CITY>_<code>_[cjenik_robe_]<number>_<time>.csv",
+    # the OIB and "cjenik_robe" since 2026-11-20. "_" in the address stands
+    # for a space or a removed character ("Trg sv. Jurja 11_A").
+    FILE_NAME_RE = re.compile(
+        r"^(?:\d{11}_)?(?P<type>[^_]+)_(?P<address>.+)_(?P<city>[^_]+)"
+        r"_(?P<code>\d{6})_(?:cjenik_robe_)?\d+_\d"
+    )
 
     # Mapping for price fields
     PRICE_MAP = {
@@ -98,34 +118,17 @@ class TrgovinaKrkCrawler(BaseCrawler):
             content = self.fetch_text(self.INDEX_URL)
             soup = BeautifulSoup(content, "html.parser")
 
-            # Find all store sections with a price list for the date
-            store_sections = self._parse_store_sections(soup, date)
-
             stores = []
 
-            for store_info in store_sections:
-                logger.info(f"Processing store: {store_info['name']}")
-
-                csv_url = store_info["csv_url"]
-
-                # Create store object
-                store = Store(
-                    chain=self.CHAIN,
-                    store_id=store_info["store_id"],
-                    name=store_info["name"],
-                    store_type="supermarket",
-                    city=store_info["city"],
-                    street_address=store_info["address"],
-                    items=[],
-                )
+            for store, csv_url in self._parse_index(soup, date):
+                logger.info(f"Processing store {store.store_id}: {store.name}")
 
                 # Download and process CSV
-                products = self._process_csv_file(csv_url)
-                store.items = products
+                store.items = self._process_csv_file(csv_url)
                 stores.append(store)
 
                 logger.info(
-                    f"Retrieved {len(products)} products from {store_info['name']}"
+                    f"Retrieved {len(store.items)} products from {store.store_id}"
                 )
 
             return stores
@@ -134,100 +137,65 @@ class TrgovinaKrkCrawler(BaseCrawler):
             logger.error(f"Error getting products: {str(e)}")
             raise
 
-    def _parse_store_sections(
+    def _parse_index(
         self, soup: BeautifulSoup, date: datetime.date
-    ) -> List[Dict[str, Any]]:
+    ) -> List[tuple[Store, str]]:
         """
-        Parse store sections from the index page.
+        Find the stores with a price list for the date.
 
-        Finds all div elements containing store names and extracts store
-        information along with the store's CSV download link for the date. Each
-        store lists its price lists of the last 29 days, newest first, as
-        "DD.MM.YYYY – filename.csv" links. A store without one for the date is
-        left out.
-
-        Args:
-            soup: BeautifulSoup object of the index page
-            date: The date of the price lists
+        The index page groups the links by store, newest first, as
+        "DD.MM.YYYY. - filename.csv". A few groups hold several stores, so the
+        store comes from the file name. The first link of a store for the date
+        is its latest file.
 
         Returns:
-            List of dictionaries containing store information and CSV URLs
+            (store without items, CSV URL) pairs
         """
         hr_date = f"{date:%d.%m.%Y}"
-        store_sections = []
+        stores: Dict[str, tuple[Store, str]] = {}
+        unknown_types = set()
 
-        # Find all div elements containing store names
-        for div in soup.select("div"):
-            # Check if this div contains only the store name
-            if div.string and div.string.strip().startswith("Supermarket"):
-                store_name = div.string.strip()
+        for link in soup.select('a[href$=".csv"]'):
+            if self._extract_date_from_link(link.get_text()) != hr_date:
+                continue
 
-                # Parse store info from header
-                store_info = self._parse_store_info(store_name)
+            # The URLs are already absolute.
+            csv_url = str(link["href"])
+            file_name = unquote(csv_url.rsplit("/", 1)[-1])
+            match = self.FILE_NAME_RE.match(file_name)
+            if not match:
+                logger.warning(f"Unexpected price list file name: {file_name}")
+                continue
 
-                # Find the next ul element with CSV links
-                next_ul = div.find_next("ul")
-                if not isinstance(next_ul, Tag):
-                    continue
+            store_type = match["type"]
+            if store_type not in self.STORE_TYPES:
+                if store_type not in self.SKIPPED_STORE_TYPES:
+                    unknown_types.add(store_type)
+                continue
 
-                # Newest first, so the first link for the date is its latest
-                # file. The URLs are already absolute.
-                csv_url = next(
-                    (
-                        str(link["href"])
-                        for link in next_ul.select("a[href]")
-                        if self._extract_date_from_link(link.get_text()) == hr_date
-                    ),
-                    None,
-                )
-                if csv_url is None:
-                    logger.info(f"No price list for {date} at {store_name}")
-                    continue
+            code = match["code"]
+            if code in stores:
+                continue
 
-                store_info["csv_url"] = csv_url
-                store_sections.append(store_info)
+            city = match["city"].title()
+            stores[code] = (
+                Store(
+                    chain=self.CHAIN,
+                    store_id=code,
+                    name=f"Trgovina Krk {city}",
+                    store_type=store_type.lower(),
+                    city=city,
+                    street_address=" ".join(match["address"].replace("_", " ").split()),
+                    items=[],
+                ),
+                csv_url,
+            )
 
-        return store_sections
+        if unknown_types:
+            logger.warning(f"Skipped unknown store types: {sorted(unknown_types)}")
 
-    def _parse_store_info(self, header_text: str) -> Dict[str, Any]:
-        """
-        Parse store information from header text.
-
-        Extracts store name, address, and city from header text format:
-        "Supermarket [Address] [City]"
-
-        Args:
-            header_text: Header text containing store information
-
-        Returns:
-            Dictionary with parsed store information
-        """
-        # Examples:
-        # "Supermarket Set. sv. Bernardina 6C KRK"
-        # "Supermarket Trg sv. Jurja 11 A GORNJA STUBICA"
-        # "Supermarket Ulica dr.Franje Tudmana 1 SV.KRIZ ZACRETJE"
-        # Pattern: Supermarket (address ending with number+optional letter) (UPPERCASE CITY)
-        pattern = r"Supermarket (.*?[ 0-9][a-zA-Z]?) ([A-Z][A-Z. ]*[A-Z])$"
-        match = re.match(pattern, header_text)
-
-        if not match:
-            raise ValueError(f"Unable to parse store info from: {header_text}")
-
-        address = match.group(1).strip()
-        city = match.group(2).strip().title()
-
-        # Generate a simple store ID from the address and city
-        store_id = (
-            f"{address.replace(' ', '_').lower()}_{city.replace(' ', '_').lower()}"
-        )
-
-        return {
-            "name": f"Trgovina Krk {city}",
-            "address": address,
-            "city": city,
-            "store_id": store_id,
-            "full_name": header_text,
-        }
+        logger.info(f"Found {len(stores)} store price lists for {date}")
+        return list(stores.values())
 
     def _extract_date_from_link(self, link_text: str) -> Optional[str]:
         """Extract date from CSV link text."""
