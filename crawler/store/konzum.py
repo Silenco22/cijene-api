@@ -150,13 +150,16 @@ class KonzumCrawler(BaseCrawler):
 
         soup = BeautifulSoup(content, "html.parser")
 
+        # Fork change (2026-11-27): until 2026-11-26 the links were relative,
+        # marked format="csv", with the store in a ?title= parameter. Since
+        # 2026-11-27 they are absolute CloudFront links without that attribute,
+        # and the file name is the title (see parse_store_info).
         urls = []
-        csv_links = soup.select("a[format='csv']")
-
-        for link in csv_links:
-            href = link.get("href")
-            if href:
-                urls.append(f"{self.BASE_URL}{href}")
+        for link in soup.select("a[href]"):
+            href = str(link.get("href"))
+            path = urllib.parse.urlparse(href).path
+            if link.get("format") == "csv" or path.lower().endswith(".csv"):
+                urls.append(urllib.parse.urljoin(self.BASE_URL, href))
 
         return list(set(urls))
 
@@ -176,6 +179,12 @@ class KonzumCrawler(BaseCrawler):
         parsed_url = urllib.parse.urlparse(url)
         query_params = urllib.parse.parse_qs(parsed_url.query)
         title = urllib.parse.unquote(query_params.get("title", [""])[0])
+        if not title:
+            # Fork change (2026-11-27): the file name is the title, prefixed
+            # with the date: 20261127-SUPER,ŽITNA 1A 10310 IVANIĆ GRAD,0204,
+            # 113814,27.11.2026, 05-23.CSV
+            filename = urllib.parse.unquote(parsed_url.path.rsplit("/", 1)[-1])
+            title = re.sub(r"^\d{8}-", "", filename)
         title = title.replace("_", " ")
 
         if not title:
