@@ -8,6 +8,7 @@ from time import time
 from typing import List
 
 from crawler.store.base import CrawlerBlocked, CrawlerFormatChanged
+from crawler.store.bipa import BipaCrawler
 from crawler.store.boso import BosoCrawler
 from crawler.store.branka import BrankaCrawler
 from crawler.store.brodokomerc import BrodokomercCrawler
@@ -17,6 +18,7 @@ from crawler.store.dm import DmCrawler
 from crawler.store.dukat import DukatCrawler
 from crawler.store.eurospin import EurospinCrawler
 from crawler.store.gavranovic import GavranovicCrawler
+from crawler.store.inovine import INovineCrawler
 from crawler.store.jadranka_trgovina import JadrankaTrgovinaCrawler
 from crawler.store.kaufland import KauflandCrawler
 from crawler.store.konzum import KonzumCrawler
@@ -26,6 +28,8 @@ from crawler.store.lorenco import LorencoCrawler
 from crawler.store.metro import MetroCrawler
 from crawler.store.ntl import NtlCrawler
 from crawler.store.output import copy_archive_info, create_archive, save_chain
+from crawler.store.petcentar import PetCentarCrawler
+from crawler.store.pivac import PivacCrawler
 from crawler.store.plodine import PlodineCrawler
 from crawler.store.ribola import RibolaCrawler
 from crawler.store.roto import RotoCrawler
@@ -37,6 +41,7 @@ from crawler.store.tommy import TommyCrawler
 from crawler.store.trgocentar import TrgocentarCrawler
 from crawler.store.trgovina_krk import TrgovinaKrkCrawler
 from crawler.store.vrutak import VrutakCrawler
+from crawler.store.zoocity import ZooCityCrawler
 from crawler.store.zabac import ZabacCrawler
 
 logger = logging.getLogger(__name__)
@@ -71,6 +76,11 @@ CRAWLERS = {
     DukatCrawler.CHAIN: DukatCrawler,
     StanicCrawler.CHAIN: StanicCrawler,
     StridonCrawler.CHAIN: StridonCrawler,
+    PivacCrawler.CHAIN: PivacCrawler,
+    BipaCrawler.CHAIN: BipaCrawler,
+    ZooCityCrawler.CHAIN: ZooCityCrawler,
+    PetCentarCrawler.CHAIN: PetCentarCrawler,
+    INovineCrawler.CHAIN: INovineCrawler,
 }
 
 

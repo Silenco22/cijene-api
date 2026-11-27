@@ -35,11 +35,13 @@ class TrgovinaKrkCrawler(BaseCrawler):
         # The values did not change with the header: on the switch day nearly
         # every pre-existing product kept its 2.5.2025 value, so the column name
         # says nothing reliable about which reference date a row refers to.
+        # Renamed to "Bazna cijena" by 2026-11-25 (NN 132/2026).
         "anchor_price": (
             [
                 "Sidrena cijena na 2.5.2025",
                 "Sidrena cijena na 10.09.2026",
                 "Sidrena cijena",
+                "Bazna cijena",
             ],
             False,
         ),
@@ -68,6 +70,7 @@ class TrgovinaKrkCrawler(BaseCrawler):
             "Sidrena cijena na 2.5.2025",
             "Sidrena cijena na 10.09.2026",
             "Sidrena cijena",
+            "Bazna cijena",
         ],
         "Naziv proizvoda",
         "Šifra proizvoda",
@@ -95,16 +98,15 @@ class TrgovinaKrkCrawler(BaseCrawler):
             content = self.fetch_text(self.INDEX_URL)
             soup = BeautifulSoup(content, "html.parser")
 
-            # Find all store sections
-            store_sections = self._parse_store_sections(soup)
+            # Find all store sections with a price list for the date
+            store_sections = self._parse_store_sections(soup, date)
 
             stores = []
 
             for store_info in store_sections:
                 logger.info(f"Processing store: {store_info['name']}")
 
-                # Get the latest CSV file for this store
-                csv_url = store_info["latest_csv_url"]
+                csv_url = store_info["csv_url"]
 
                 # Create store object
                 store = Store(
@@ -132,19 +134,26 @@ class TrgovinaKrkCrawler(BaseCrawler):
             logger.error(f"Error getting products: {str(e)}")
             raise
 
-    def _parse_store_sections(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+    def _parse_store_sections(
+        self, soup: BeautifulSoup, date: datetime.date
+    ) -> List[Dict[str, Any]]:
         """
         Parse store sections from the index page.
 
-        Finds all div elements containing store names and extracts store information
-        along with their associated CSV download links.
+        Finds all div elements containing store names and extracts store
+        information along with the store's CSV download link for the date. Each
+        store lists its price lists of the last 29 days, newest first, as
+        "DD.MM.YYYY – filename.csv" links. A store without one for the date is
+        left out.
 
         Args:
             soup: BeautifulSoup object of the index page
+            date: The date of the price lists
 
         Returns:
             List of dictionaries containing store information and CSV URLs
         """
+        hr_date = f"{date:%d.%m.%Y}"
         store_sections = []
 
         # Find all div elements containing store names
@@ -158,19 +167,25 @@ class TrgovinaKrkCrawler(BaseCrawler):
 
                 # Find the next ul element with CSV links
                 next_ul = div.find_next("ul")
-                if isinstance(next_ul, Tag):
-                    csv_links = next_ul.select("a[href]")
-                    if csv_links:
-                        # Get the first (most recent) CSV link
-                        latest_link = csv_links[0]
-                        csv_url = latest_link["href"]  # Already absolute URL
+                if not isinstance(next_ul, Tag):
+                    continue
 
-                        store_info["latest_csv_url"] = csv_url
-                        store_info["date"] = self._extract_date_from_link(
-                            latest_link.get_text()
-                        )
+                # Newest first, so the first link for the date is its latest
+                # file. The URLs are already absolute.
+                csv_url = next(
+                    (
+                        str(link["href"])
+                        for link in next_ul.select("a[href]")
+                        if self._extract_date_from_link(link.get_text()) == hr_date
+                    ),
+                    None,
+                )
+                if csv_url is None:
+                    logger.info(f"No price list for {date} at {store_name}")
+                    continue
 
-                        store_sections.append(store_info)
+                store_info["csv_url"] = csv_url
+                store_sections.append(store_info)
 
         return store_sections
 
@@ -217,7 +232,7 @@ class TrgovinaKrkCrawler(BaseCrawler):
     def _extract_date_from_link(self, link_text: str) -> Optional[str]:
         """Extract date from CSV link text."""
         # Format: "05.07.2025 – filename.csv"
-        date_match = re.match(r"(\d{2}\.\d{2}\.\d{4})", link_text)
+        date_match = re.match(r"(\d{2}\.\d{2}\.\d{4})", link_text.strip())
         return date_match.group(1) if date_match else None
 
     def _process_csv_file(self, csv_url: str) -> List:

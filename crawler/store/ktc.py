@@ -76,6 +76,17 @@ class KtcCrawler(BaseCrawler):
         "frizerski salon",
     )
 
+    # Points of sale skipped by their name on the index, before their page is
+    # fetched: restaurants, which are listed but have no price lists, the
+    # travel agency and the car washes. The file names of the agency and of
+    # one car wash contain "/", which hides the store type
+    # ("PUTNICKA AGENCIJA PJ-37/-NIKOLE TESLE 18 ...").
+    SKIPPED_POINTS_OF_SALE = ("RESTORAN ", "PUTNICKA AGENCIJA", "AUTOPRAONICA")
+
+    # Since 2026-11-27 a store lists goods ("roba") and services ("usluge")
+    # files, some exported twice a day. The earlier export can be header-only.
+    FILE_DATE_PATTERN = re.compile(r"-(?P<date>\d{8})-(?P<time>\d{6})\.csv$")
+
     CITIES = [
         "KRIZEVCI",
         "VARAZDIN",
@@ -122,8 +133,13 @@ class KtcCrawler(BaseCrawler):
 
         for link in store_links:
             href = link.get("href")
-            if href:
-                store_urls.append(f"{self.BASE_URL}/{href}")
+            if not href:
+                continue
+            name = unquote(str(href).split("poslovnica=", 1)[1]).upper()
+            if name.startswith(self.SKIPPED_POINTS_OF_SALE):
+                logger.debug(f"Skipping point of sale {name}")
+                continue
+            store_urls.append(f"{self.BASE_URL}/{href}")
 
         return list(set(store_urls))
 
@@ -142,25 +158,30 @@ class KtcCrawler(BaseCrawler):
         soup = BeautifulSoup(content, "html.parser")
 
         date_str = date.strftime("%Y%m%d")
-        csv_links = soup.select('a[href$=".csv"]')
-
-        for link in csv_links:
+        candidates = []
+        for link in soup.select('a[href$=".csv"]'):
             href = str(link.get("href"))
-            if date_str in href:
-                if href.startswith("/"):
-                    return f"{self.BASE_URL}{href}"
-                else:
-                    return f"{self.BASE_URL}/{href}"
+            m = self.FILE_DATE_PATTERN.search(href)
+            if m and m["date"] == date_str and "-usluge-" not in href:
+                candidates.append((m["time"], href))
 
-        raise ValueError(f"No CSV found for date {date} at {store_url}")
+        if not candidates:
+            raise ValueError(f"No CSV found for date {date} at {store_url}")
+
+        # The latest goods file of the date
+        href = max(candidates)[1]
+        if href.startswith("/"):
+            return f"{self.BASE_URL}{href}"
+        return f"{self.BASE_URL}/{href}"
 
     def parse_store_info(self, csv_url: str) -> Store:
         """
         Extracts store information from a CSV download URL.
 
 
-        Format example (URL path basename):
+        Format examples (URL path basename), until and since 2026-11-27:
             `TRGOVINA-SENJSKA ULICA 118 KARLOVAC-PJ8A-1-20250515-071626.csv`
+            `95970838122_TRGOVINA-NIKOLE TESLE 18 KRIZEVCI-PJ93-roba-1-20261127-071725.csv`
 
         Args:
             csv_url: CSV download URL with store information
@@ -188,7 +209,8 @@ class KtcCrawler(BaseCrawler):
         if len(parts) < 3:
             raise ValueError(f"Invalid CSV filename format: {csv_filename}")
 
-        store_type = parts[0].lower()
+        # Without the company's OIB prefix
+        store_type = re.sub(r"^\d+_", "", parts[0]).lower()
         store_id = parts[2]
 
         # Address is the second part, but might contain the city name too

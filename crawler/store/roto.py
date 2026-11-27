@@ -4,7 +4,7 @@ import datetime
 import logging
 import re
 from typing import NamedTuple
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -23,6 +23,11 @@ class RotoCrawler(BaseCrawler):
     CHAIN = "roto"
     BASE_URL = "https://www.rotodinamic.hr"
     INDEX_URL = f"{BASE_URL}/cjenici/"
+
+    # Store ID, publication date and time at the end of a CSV filename
+    FILENAME_PATTERN = re.compile(
+        r"_(?P<store_id>D\d+)_roba_\d+_(?P<date>\d{8})_(?P<time>\d{4})\.csv$"
+    )
 
     ANCHOR_PRICE_COLUMN = "sidrena cijena na 2.5.2025."
     ANCHOR_PRICE_DATE = datetime.date(2025, 5, 2)
@@ -98,33 +103,57 @@ class RotoCrawler(BaseCrawler):
 
         return data
 
-    def get_csv_urls(self, soup: BeautifulSoup, date: datetime.date) -> list[str]:
-        anchors = soup.select("a.cjenici-table-row")
-        hr_date = date.strftime("%d.%m.%Y")
+    def get_csv_urls(
+        self, soup: BeautifulSoup, date: datetime.date
+    ) -> list[tuple[str, str, str]]:
+        """
+        Find the price lists published on the date, the latest one per store.
 
-        urls = []
-        for anchor in anchors:
+        Since 2026-11-26 Roto publishes one CSV per store, named like
+        24723122482_Cash&Carry_Kovinska 1 ZAGREB_D01_roba_382_20261126_0752.csv.
+        The link text holds the store ID and name ("D01 Zagreb"), and the name
+        is the key of the store's address on the same page.
+
+        Returns:
+            (CSV URL, store ID, store name) for each store.
+        """
+        target = f"{date:%Y%m%d}"
+        latest: dict[str, tuple[str, str, str]] = {}
+
+        for anchor in soup.select("a.cjenici-table-row"):
             url = anchor.attrs["href"]
             assert isinstance(url, str)
-            url_date = urlparse(url).path.split(",")[-2].strip()
-            if url_date == hr_date and url not in urls:
-                urls.append(url)
+            match = self.FILENAME_PATTERN.search(unquote(urlparse(url).path))
+            if not match or match["date"] != target:
+                continue
 
-        if not urls:
+            store_id = match["store_id"]
+            label = anchor.select_one(".cjenici-datum")
+            label_text = label.get_text(" ", strip=True) if label else ""
+            name = label_text.removeprefix(store_id).strip()
+
+            time = match["time"]
+            if store_id not in latest or time > latest[store_id][0]:
+                latest[store_id] = (time, url, name)
+
+        if not latest:
             raise ValueError(f"No price list found for {date}")
 
-        return urls
+        return [(url, store_id, name) for store_id, (_, url, name) in latest.items()]
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
         html_content = self.fetch_text(self.INDEX_URL)
         soup = BeautifulSoup(html_content, "html.parser")
-        csv_urls = self.get_csv_urls(soup, date)
+        csv_files = self.get_csv_urls(soup, date)
         addresses = self.parse_store_addresses(soup)
 
         stores = []
-        for csv_url in csv_urls:
+        for csv_url, store_id, name in csv_files:
             products = self.get_store_products(csv_url)
-            stores.extend(self.get_stores(csv_url, products, addresses))
+            if not products:
+                logger.warning(f"No products for {store_id} {name}, skipping")
+                continue
+            stores.append(self.get_store(store_id, name, products, addresses))
         return stores
 
     def get_store_products(self, csv_url: str) -> list[Product]:
@@ -135,44 +164,29 @@ class RotoCrawler(BaseCrawler):
             logger.exception(f"Failed to get store prices from {csv_url}")
             return []
 
-    def get_stores(
+    def get_store(
         self,
-        csv_url: str,
+        store_id: str,
+        name: str,
         products: list[Product],
         addresses: dict[str, Address],
-    ):
-        # Extract store ids and names from the CSV file
-        matches = []
-        parts = urlparse(csv_url).path.split(",")
-        for part in parts:
-            part = part.strip()
-            if re.match("D[0-9]+ ", part):
-                store_id, name = part.split(" ")
-                matches.append((store_id, name))
+    ) -> Store:
+        if name in addresses:
+            street_address, zipcode, city = addresses[name]
+        else:
+            street_address, zipcode, city = "", "", ""
+            logger.warning(f"Unable to find address for {store_id} {name}")
 
-        # Ideally the count will match the addresses extracted from the web page
-        if len(matches) != len(addresses):
-            logger.warning(
-                f"Store count mismatch: found {len(matches)} stores in CSV name and {len(addresses)} stores on the roto web page."
-            )
-
-        for store_id, name in matches:
-            if name in addresses:
-                street_address, zipcode, city = addresses[name]
-            else:
-                street_address, zipcode, city = "", "", ""
-                logger.warning(f"Unable to find address for {store_id} {name}")
-
-            yield Store(
-                chain=self.CHAIN,
-                store_type="Cash & Carry",
-                store_id=store_id,
-                name=f"Cash & Carry {name}",
-                street_address=street_address,
-                zipcode=zipcode,
-                city=city,
-                items=products,
-            )
+        return Store(
+            chain=self.CHAIN,
+            store_type="Cash & Carry",
+            store_id=store_id,
+            name=f"Cash & Carry {name}",
+            street_address=street_address,
+            zipcode=zipcode,
+            city=city,
+            items=products,
+        )
 
     def parse_store_addresses(self, soup: BeautifulSoup) -> dict[str, Address]:
         """Returns store address indexed by store name"""
@@ -209,8 +223,8 @@ class Address(NamedTuple):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     crawler = RotoCrawler()
-    yesterday = datetime.date.today() - datetime.timedelta(days=1)
-    stores = crawler.get_all_products(yesterday)
+    # The index lists only the current day's price lists
+    stores = crawler.get_all_products(datetime.date.today())
     from pprint import pp
 
     pp(stores[0])

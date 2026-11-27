@@ -22,19 +22,69 @@ def cell_str(val):
     return "" if val is None else str(val).strip()
 
 
-# Decoded file name: "#"-separated store type, street address, place, store id,
-# file id and timestamp. The place is "ZIP CITY" since 2026-11-14 and only the
-# city before that. Older names lost their diacritics to "?". The files are CSV
-# since 2026-11-16 10:19, XLSX before that.
+# Decoded file name since 2026-11-24: "#"-separated OIB, store type, place,
+# store id, kind of price list (ROBA for goods, USLUGA for services), file id
+# and timestamp. The place is street address, zip code and city, and spaces in
+# it are "_".
+#   11279847062#PRODAVAONICA#ČIKOLE_2_22320_DRNIŠ#02044#ROBA#26330#20261126_0307.csv
+FILENAME_PATTERN = re.compile(
+    r"^\d+#(?P<store_type>[^#]*)#(?P<place>[^#]*)#(?P<store_id>\d+)#"
+    r"(?P<kind>[^#]*)#\d+#(?P<date>\d{8})_(?P<time>\d{4})\.csv$"
+)
+ADDRESS_PLACE_PATTERN = re.compile(
+    r"^(?P<address>.*?)_(?P<zipcode>\d{5})_(?P<city>.+)$"
+)
+
+# Decoded file name until 2026-11-23: "#"-separated store type, street address,
+# place, store id, file id and timestamp. The place is "ZIP CITY" since
+# 2026-11-14 and only the city before that. Older names lost their diacritics
+# to "?". The files are CSV since 2026-11-16 10:19, XLSX before that.
 #   PRODAVAONICA#ČIKOLE 2#22320 DRNIŠ#02044#26321#2026-11-17T010554.csv
 #   PRODAVAONICA#ČIKOLE 2#22320 DRNIŠ#02044#26318#2026-11-14T010557.xlsx
 #   SUPERMARKET#PUT GA?ELEZA 5A#VODICE#02010#26317#2026-11-13T010506.xlsx
-FILENAME_PATTERN = re.compile(
+OLD_FILENAME_PATTERN = re.compile(
     r"^(?P<store_type>[^#]*)#(?P<address>[^#]*)#(?P<place>[^#]*)#"
     r"(?P<store_id>\d+)#\d+#(?P<date>\d{4}-\d{2}-\d{2})T(?P<time>\d{6})"
     r"\.(?:xlsx|csv)$"
 )
 PLACE_PATTERN = re.compile(r"^(?P<zipcode>\d{5})\s+(?P<city>.+)$")
+
+
+def parse_filename(name: str) -> tuple[str, str, dict[str, str]] | None:
+    """
+    Read a decoded file name in either format.
+
+    Returns:
+        The publication date (YYYY-MM-DD), the time (HHMMSS), and the store
+        info: store id, store type, street address, city and zip code. None if
+        the name is in neither format, or is a price list of services.
+    """
+    if m := FILENAME_PATTERN.match(name):
+        if m["kind"] != "ROBA":
+            return None
+        pm = ADDRESS_PLACE_PATTERN.match(m["place"])
+        address, zipcode, city = pm.groups() if pm else (m["place"], "", "")
+        d = m["date"]
+        date = f"{d[:4]}-{d[4:6]}-{d[6:]}"
+        time = f"{m['time']}00"
+    elif m := OLD_FILENAME_PATTERN.match(name):
+        address = m["address"]
+        place = m["place"].strip()
+        pm = PLACE_PATTERN.match(place)
+        zipcode, city = (pm["zipcode"], pm["city"]) if pm else ("", place)
+        date, time = m["date"], m["time"]
+    else:
+        return None
+
+    info = {
+        "store_id": m["store_id"],
+        "store_type": m["store_type"].replace("_", " ").strip().lower(),
+        "street_address": address.replace("_", " ").strip(),
+        "city": city.replace("_", " ").strip(),
+        "zipcode": zipcode,
+    }
+    return date, time, info
+
 
 # Store metadata keyed by store_id (from XLSX column A). Overrides what the file
 # name says, for stores whose name lacks the address or spells it wrong.
@@ -71,7 +121,8 @@ class DjeloVodiceCrawler(BaseCrawler):
     listing had only the Vodice supermarket (02010). From 2026-11-14 it has
     about 38 points of sale, mostly shops around Šibenik. The files were XLSX
     until 2026-11-16 and are CSV (";", UTF-8) since, with the same columns.
-    Each file is read by the column names in the header row.
+    On 2026-11-24 the file names and the columns changed (see the column
+    lists). Each file is read by the column names in the header row.
     """
 
     CHAIN = "djelo_vodice"
@@ -82,27 +133,31 @@ class DjeloVodiceCrawler(BaseCrawler):
     PRICE_MAP = {}
     FIELD_MAP = {}
 
+    # On 2026-11-24 "Sidrena cijena" became "Bazna cijena" (NN 132/2026), and
+    # "Obr. jedinica mjere" (KILOGRAM, the unit of the unit price) was dropped,
+    # which leaves "Jedinica mjere" (KOMAD etc.). The store columns were
+    # dropped too; the store id comes from the file name.
     REQUIRED_COLUMNS = [
-        "Šifra prodajnog mjesta",
-        "Naziv prodajnog mjesta",
         "Šifra artikla",
         "Naziv artikla",
-        "Sidrena cijena",
+        ["Sidrena cijena", "Bazna cijena"],
         "Barkod",
         "MP cijena",
         "Cijena za jedinicu mj.",
-        "Obr. jedinica mjere",
+        ["Obr. jedinica mjere", "Jedinica mjere"],
     ]
 
-    # "Raspoloživo" (availability) and "Akcija" (Da/Ne promo flag) appeared on
-    # 2026-11-14. "Kategorija" was dropped the same day; it is still read from
-    # older files, but not listed here, because it would warn on every file.
+    # "Akcija" (Da/Ne promo flag) appeared on 2026-11-14, "Marka" and "Neto
+    # količina" on 2026-11-24. "Kategorija" (dropped 2026-11-14) and
+    # "Raspoloživo" (2026-11-14 to 2026-11-23) are still read from older files,
+    # but not listed here, because they would warn on every file.
     # On "Akcija" rows "MP cijena" is the promo price, so it is also the
     # special price. The flag doesn't name the form of sale, so
     # special_sale_type stays empty.
     OPTIONAL_COLUMNS = [
-        "Raspoloživo",
         "Akcija",
+        "Marka",
+        "Neto količina",
     ]
 
     def get_index(self, date: datetime.date) -> list[tuple[str, dict[str, str]]]:
@@ -116,7 +171,8 @@ class DjeloVodiceCrawler(BaseCrawler):
 
         Returns:
             (URL, store info) for each store, where the store info holds the
-            store type, street address, city and zip code from the file name.
+            store id, store type, street address, city and zip code from the
+            file name.
 
         Raises:
             ValueError: If no file is found for the target date.
@@ -132,24 +188,15 @@ class DjeloVodiceCrawler(BaseCrawler):
             if not href:
                 continue
 
-            m = FILENAME_PATTERN.match(unquote(str(href)))
-            if not m or m.group("date") != target:
+            parsed = parse_filename(unquote(str(href)))
+            if not parsed or parsed[0] != target:
                 continue
 
-            store_id = m.group("store_id")
+            _, time, info = parsed
+            store_id = info["store_id"]
             if store_id in SKIPPED_STORES:
                 continue
 
-            place = m.group("place").strip()
-            pm = PLACE_PATTERN.match(place)
-            info = {
-                "store_type": m.group("store_type").strip().lower(),
-                "street_address": m.group("address").strip(),
-                "city": pm.group("city") if pm else place,
-                "zipcode": pm.group("zipcode") if pm else "",
-            }
-
-            time = m.group("time")
             if store_id not in latest or time > latest[store_id][0]:
                 latest[store_id] = (time, f"{self.BASE_URL}/{href}", info)
 
@@ -159,19 +206,16 @@ class DjeloVodiceCrawler(BaseCrawler):
         return [(url, info) for _, url, info in latest.values()]
 
     def parse_excel(
-        self, excel_data: bytes, store_info: dict[str, str] | None = None
+        self, excel_data: bytes, store_info: dict[str, str]
     ) -> tuple[Store, list[Product]]:
         """
         Parse an XLSX file into a Store object and list of Product objects.
 
-        The XLSX has a single sheet "Cijene na dan" with a header row. Besides
-        the columns in REQUIRED_COLUMNS and OPTIONAL_COLUMNS it has
-        "Jedinica mjere" (KOMAD etc.) and "Akcija", which are not used.
+        The XLSX has a single sheet "Cijene na dan" with a header row.
 
         Args:
             excel_data: Raw XLSX file content as bytes.
-            store_info: Store type, address, city and zip code from the file
-                name. Entries in STORES take precedence.
+            store_info: Store info from the file name, see parse_rows.
 
         Returns:
             Tuple of (Store, list of Products).
@@ -188,18 +232,17 @@ class DjeloVodiceCrawler(BaseCrawler):
         return self.parse_rows(worksheet.iter_rows(values_only=True), store_info)
 
     def parse_csv_file(
-        self, text: str, store_info: dict[str, str] | None = None
+        self, text: str, store_info: dict[str, str]
     ) -> tuple[Store, list[Product]]:
         """
         Parse a CSV price list into a Store object and list of Product objects.
 
-        The CSV has the same columns as the XLSX, separated by ";", with
-        decimal commas.
+        Until 2026-11-23 the CSV has the same columns as the XLSX. It is
+        separated by ";", with decimal commas.
 
         Args:
             text: CSV file content.
-            store_info: Store type, address, city and zip code from the file
-                name. Entries in STORES take precedence.
+            store_info: Store info from the file name, see parse_rows.
 
         Returns:
             Tuple of (Store, list of Products).
@@ -211,15 +254,15 @@ class DjeloVodiceCrawler(BaseCrawler):
         return self.parse_rows((tuple(row) for row in rows), store_info)
 
     def parse_rows(
-        self, rows: Iterable[tuple], store_info: dict[str, str] | None = None
+        self, rows: Iterable[tuple], store_info: dict[str, str]
     ) -> tuple[Store, list[Product]]:
         """
         Parse the rows of a price list, header first, into a Store and Products.
 
         Args:
             rows: Rows of cell values (XLSX) or strings (CSV).
-            store_info: Store type, address, city and zip code from the file
-                name. Entries in STORES take precedence.
+            store_info: Store id, type, address, city and zip code from the
+                file name. Entries in STORES take precedence.
 
         Returns:
             Tuple of (Store, list of Products).
@@ -232,44 +275,43 @@ class DjeloVodiceCrawler(BaseCrawler):
         self.check_columns(header)
         index = {name.lower(): i for i, name in enumerate(header) if name}
 
-        def cell(row: tuple, column: str) -> str:
-            i = index.get(column.lower())
-            return cell_str(row[i]) if i is not None and i < len(row) else ""
+        def cell(row: tuple, *columns: str) -> str:
+            """Value of the first of the columns the file has."""
+            for column in columns:
+                i = index.get(column.lower())
+                if i is not None:
+                    return cell_str(row[i]) if i < len(row) else ""
+            return ""
+
+        store_id = store_info["store_id"]
+        info = {**store_info, **STORES.get(store_id, {})}
+        city = info.get("city", "")
+        store = Store(
+            chain=self.CHAIN,
+            store_id=store_id,
+            name=info.get("name", f"Djelo Vodice {city}"),
+            store_type=info.get("store_type", ""),
+            city=city,
+            street_address=info.get("street_address", ""),
+            zipcode=info.get("zipcode", ""),
+        )
+        if not city:
+            logger.warning(
+                f"No city for store_id '{store_id}', "
+                f"add it to the STORES map in djelo_vodice.py"
+            )
 
         products = []
-        store = None
-
         for row_idx, row in enumerate(rows, start=2):
-            store_id = cell(row, "Šifra prodajnog mjesta")
-            store_name = cell(row, "Naziv prodajnog mjesta")
-
-            if not store_id:
+            if not any(cell_str(value) for value in row):
                 continue
-
-            # Build store from first data row
-            if store is None:
-                info = {**(store_info or {}), **STORES.get(store_id, {})}
-                store = Store(
-                    chain=self.CHAIN,
-                    store_id=store_id,
-                    name=info.get("name", store_name),
-                    store_type=info.get("store_type", ""),
-                    city=info.get("city", ""),
-                    street_address=info.get("street_address", ""),
-                    zipcode=info.get("zipcode", ""),
-                )
-                if not store.city:
-                    logger.warning(
-                        f"No city for store_id '{store_id}' ({store_name}), "
-                        f"add it to the STORES map in djelo_vodice.py"
-                    )
 
             try:
                 data = {
                     "product_id": cell(row, "Šifra artikla"),
                     "product": cell(row, "Naziv artikla"),
                     "anchor_price": self.parse_price(
-                        cell(row, "Sidrena cijena"), False
+                        cell(row, "Sidrena cijena", "Bazna cijena"), False
                     ),
                     "barcode": cell(row, "Barkod"),
                     "category": cell(row, "Kategorija"),
@@ -277,10 +319,10 @@ class DjeloVodiceCrawler(BaseCrawler):
                     "unit_price": self.parse_price(
                         cell(row, "Cijena za jedinicu mj."), True
                     ),
-                    "unit": cell(row, "Obr. jedinica mjere"),
+                    "unit": cell(row, "Obr. jedinica mjere", "Jedinica mjere"),
                     "available": self.parse_bool(cell(row, "Raspoloživo")),
-                    "brand": "",
-                    "quantity": "",
+                    "brand": cell(row, "Marka"),
+                    "quantity": cell(row, "Neto količina"),
                 }
                 if self.parse_bool(cell(row, "Akcija")):
                     data["special_price"] = data["price"]
@@ -291,10 +333,7 @@ class DjeloVodiceCrawler(BaseCrawler):
                 logger.warning(f"Failed to parse row {row_idx}: `{row_txt}`: {e}")
                 continue
 
-        if store is None:
-            raise ValueError("No data rows found in the XLSX file")
-
-        logger.debug(f"Parsed {len(products)} products from Excel file")
+        logger.debug(f"Parsed {len(products)} products for store {store_id}")
         return store, products
 
     def get_all_products(self, date: datetime.date) -> list[Store]:

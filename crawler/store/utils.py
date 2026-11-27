@@ -1,10 +1,37 @@
+import csv
 import datetime
 import logging
 import re
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+from functools import lru_cache
+from pathlib import Path
 from typing import Optional, overload
 
 logger = logging.getLogger(__name__)
+
+_STORES_CSV = Path(__file__).parents[2] / "enrichment" / "stores.csv"
+
+
+@lru_cache
+def load_store_map(chain: str) -> dict[str, dict[str, str]]:
+    """
+    Store details for one chain from enrichment/stores.csv, keyed by store code.
+
+    For chains whose files carry no usable store address. The same rows add
+    coordinates and phone numbers in the database (service.db.enrich -s), so
+    the crawler output and the enrichment data can't disagree.
+
+    Args:
+        chain: Chain code, as in the chain_code column
+
+    Returns:
+        Rows of that chain (id, chain_code, code, type, address, city,
+        zipcode, lat, lon, phone), keyed by code
+    """
+    with open(_STORES_CSV, encoding="utf-8", newline="") as f:
+        return {
+            row["code"]: row for row in csv.DictReader(f) if row["chain_code"] == chain
+        }
 
 
 def to_camel_case(text: str) -> str:

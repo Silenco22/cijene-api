@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import logging
+import sys
 import zipfile
 from csv import DictReader
 from datetime import date, datetime
@@ -19,6 +20,9 @@ from service.db.stats import compute_stats
 logger = logging.getLogger("importer")
 
 db = settings.get_db()
+
+# products.ean is VARCHAR(50)
+MAX_BARCODE_LENGTH = 50
 
 
 async def read_csv(file_path: Path) -> List[Dict[str, str]]:
@@ -127,6 +131,7 @@ async def process_products(
         for p in products_data
         if p["product_id"] not in chain_product_map
     ]
+    new_products = [p for p in new_products if len(p["barcode"]) <= MAX_BARCODE_LENGTH]
 
     if not new_products:
         return chain_product_map
@@ -314,26 +319,36 @@ async def process_chain(
     logger.info(f"Imported {n_new_prices} new prices for {code}")
 
 
-async def import_archive(path: Path, compute_stats_flag: bool = True):
-    """Import data from all chain directories in the given zip archive."""
+async def import_archive(path: Path, compute_stats_flag: bool = True) -> list[str]:
+    """
+    Import data from all chain directories in the given zip archive.
+
+    Returns:
+        Codes of the chains that failed to import.
+    """
     try:
         price_date = datetime.strptime(path.stem, "%Y-%m-%d")
     except ValueError:
         logger.error(f"`{path.stem}` is not a valid date in YYYY-MM-DD format")
-        return
+        return []
 
     with TemporaryDirectory() as temp_dir:
         logger.debug(f"Extracting archive {path} to {temp_dir}")
         with zipfile.ZipFile(path, "r") as zip_ref:
             zip_ref.extractall(temp_dir)
-        await _import(Path(temp_dir), price_date, compute_stats_flag)
+        return await _import(Path(temp_dir), price_date, compute_stats_flag)
 
 
-async def import_directory(path: Path, compute_stats_flag: bool = True) -> None:
-    """Import data from all chain directories in the given directory."""
+async def import_directory(path: Path, compute_stats_flag: bool = True) -> list[str]:
+    """
+    Import data from all chain directories in the given directory.
+
+    Returns:
+        Codes of the chains that failed to import.
+    """
     if not path.is_dir():
         logger.error(f"`{path}` does not exist or is not a directory")
-        return
+        return []
 
     try:
         price_date = datetime.strptime(path.name, "%Y-%m-%d")
@@ -341,37 +356,55 @@ async def import_directory(path: Path, compute_stats_flag: bool = True) -> None:
         logger.error(
             f"Directory `{path.name}` is not a valid date in YYYY-MM-DD format"
         )
-        return
+        return []
 
-    await _import(path, price_date, compute_stats_flag)
+    return await _import(path, price_date, compute_stats_flag)
 
 
 async def _import(
     path: Path, price_date: datetime, compute_stats_flag: bool = True
-) -> None:
+) -> list[str]:
+    """
+    Import all chain directories in `path`, then compute the stats.
+
+    A chain that fails is logged and skipped, so that it does not stop the
+    other chains and the stats.
+
+    Returns:
+        Codes of the chains that failed to import.
+    """
     chain_dirs = [d.resolve() for d in path.iterdir() if d.is_dir()]
     if not chain_dirs:
         logger.warning(f"No chain directories found in {path}")
-        return
+        return []
 
     logger.debug(f"Importing {len(chain_dirs)} chains from {path}")
 
     t0 = time()
 
     barcodes = await db.get_product_barcodes()
+    failed = []
     for chain_dir in chain_dirs:
-        await process_chain(price_date, chain_dir, barcodes)
+        try:
+            await process_chain(price_date, chain_dir, barcodes)
+        except Exception:
+            logger.exception(f"Failed to import chain {chain_dir.name}")
+            failed.append(chain_dir.name)
 
     dt = int(time() - t0)
-    logger.info(f"Imported {len(chain_dirs)} chains in {dt} seconds")
+    logger.info(f"Imported {len(chain_dirs) - len(failed)} chains in {dt} seconds")
+    if failed:
+        logger.error(f"Failed to import {len(failed)} chain(s): {', '.join(failed)}")
 
     if compute_stats_flag:
         await compute_stats(price_date)
     else:
         logger.debug(f"Skipping statistics computation for {price_date:%Y-%m-%d}")
 
+    return failed
 
-async def main():
+
+async def main() -> int:
     """
     Import price data from directories or zip archives.
 
@@ -386,6 +419,9 @@ async def main():
 
     Database connection settings are loaded from the service configuration, see
     `service/config.py` for details.
+
+    A chain that fails to import is logged and skipped; the other chains and
+    the stats are still imported, and the exit status is 1.
     """
     parser = argparse.ArgumentParser(
         description=main.__doc__,
@@ -420,19 +456,22 @@ async def main():
 
     await db.connect()
 
+    failed = []
     try:
         await db.create_tables()
 
         for path in args.paths:
             if path.is_dir():
-                await import_directory(path, compute_stats_flag)
+                failed += await import_directory(path, compute_stats_flag)
             elif path.suffix.lower() == ".zip":
-                await import_archive(path, compute_stats_flag)
+                failed += await import_archive(path, compute_stats_flag)
             else:
                 logger.error(f"Path `{path}` is neither a directory nor a zip archive.")
     finally:
         await db.close()
 
+    return 1 if failed else 0
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

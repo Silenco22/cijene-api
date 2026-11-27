@@ -172,9 +172,15 @@ class StridonCrawler(BaseCrawler):
                     f"No content found at Stridon index URL: {self.BASE_URL}"
                 )
                 return []
-            urls = self.parse_index(content)
+            # The index lists each store's newest file; keep those of the date
+            target_suffix = f"_{date:%d%m%Y}.csv"
+            urls = [
+                url
+                for url in self.parse_index(content)
+                if unquote(url).endswith(target_suffix)
+            ]
             if not urls:
-                logger.warning("No Stridon CSV URLs found on index page")
+                logger.warning(f"No Stridon CSV URLs for {date} on the index page")
             return urls
 
         logger.info(f"Fetching historical Stridon CSV files for {date:%Y-%m-%d}")

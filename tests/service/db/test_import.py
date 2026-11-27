@@ -1,6 +1,6 @@
 import asyncio
 import importlib
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -17,10 +17,26 @@ NEW_HEADER = OLD_HEADER + ",available,special_sale_type,anchor_price_date"
 class _FakeDatabase:
     def __init__(self):
         self.prices = []
+        self.eans = []
+        self.chain_products = []
 
     async def add_many_prices(self, prices):
         self.prices.extend(prices)
         return len(prices)
+
+    async def get_product_barcodes(self):
+        return {}
+
+    async def get_chain_product_map(self, chain_id):
+        return {p.code: i for i, p in enumerate(self.chain_products, 1)}
+
+    async def add_ean(self, ean):
+        self.eans.append(ean)
+        return len(self.eans)
+
+    async def add_many_chain_products(self, products):
+        self.chain_products.extend(products)
+        return len(products)
 
 
 @pytest.fixture
@@ -82,3 +98,44 @@ def test_archives_without_new_columns_still_import(db, tmp_path):
         None,
         None,
     )
+
+
+def test_product_with_a_too_long_barcode_is_skipped(db, tmp_path):
+    # ZooCity, 2026-11-26: the product name in the code column, no barcode
+    name = "Hunter oprsnica za pse Aalborg Mixed tamnosmeđa/siva"
+    path = tmp_path / "products.csv"
+    path.write_text(
+        "product_id,barcode,name,brand,category,unit,quantity\n"
+        "10045,3182550728102,Royal Canin Chihuahua,,,KG,\n"
+        f"{name},zoocity:{name},{name},Hunter,,,\n",
+        encoding="utf-8",
+    )
+
+    product_map = asyncio.run(importer.process_products(path, 1, "zoocity", {}))
+
+    assert list(product_map) == ["10045"]
+    assert db.eans == ["3182550728102"]
+
+
+def test_a_failing_chain_does_not_stop_the_import(db, tmp_path, monkeypatch):
+    for code in ("konzum", "zoocity", "spar"):
+        (tmp_path / code).mkdir()
+    imported = []
+    stats = []
+
+    async def process_chain(price_date, chain_dir, barcodes):
+        if chain_dir.name == "zoocity":
+            raise ValueError("value too long")
+        imported.append(chain_dir.name)
+
+    async def compute_stats(price_date):
+        stats.append(price_date)
+
+    monkeypatch.setattr(importer, "process_chain", process_chain)
+    monkeypatch.setattr(importer, "compute_stats", compute_stats)
+
+    failed = asyncio.run(importer._import(tmp_path, datetime(2026, 11, 26)))
+
+    assert failed == ["zoocity"]
+    assert sorted(imported) == ["konzum", "spar"]
+    assert stats == [datetime(2026, 11, 26)]

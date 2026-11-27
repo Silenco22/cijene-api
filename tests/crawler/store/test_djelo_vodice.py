@@ -37,13 +37,11 @@ ROW = [
     0.0,
     "Ne",
 ]
+INFO = {"store_id": "02010"}
 
 
-def _xlsx(
-    drop: str | None = None, reorder: bool = False, store_id: str = "02010"
-) -> bytes:
+def _xlsx(drop: str | None = None, reorder: bool = False) -> bytes:
     header, row = list(HEADER), list(ROW)
-    row[0] = store_id
     if drop:
         i = header.index(drop)
         del header[i], row[i]
@@ -61,7 +59,7 @@ def _xlsx(
 
 @pytest.mark.parametrize("reorder", [False, True])
 def test_columns_are_read_by_name(reorder):
-    store, [product] = DjeloVodiceCrawler().parse_excel(_xlsx(reorder=reorder))
+    store, [product] = DjeloVodiceCrawler().parse_excel(_xlsx(reorder=reorder), INFO)
 
     assert store.store_id == "02010"
     assert product.product_id == "010001"
@@ -74,14 +72,14 @@ def test_columns_are_read_by_name(reorder):
 
 @pytest.mark.parametrize("column", ["Kategorija", "Raspoloživo"])
 def test_missing_optional_column_still_parses(column):
-    _, [product] = DjeloVodiceCrawler().parse_excel(_xlsx(drop=column))
+    _, [product] = DjeloVodiceCrawler().parse_excel(_xlsx(drop=column), INFO)
 
     assert product.price is not None
 
 
 def test_missing_required_column_raises():
     with pytest.raises(ValueError, match="MP cijena"):
-        DjeloVodiceCrawler().parse_excel(_xlsx(drop="MP cijena"))
+        DjeloVodiceCrawler().parse_excel(_xlsx(drop="MP cijena"), INFO)
 
 
 def _crawler(monkeypatch, *names: str) -> DjeloVodiceCrawler:
@@ -113,6 +111,7 @@ def test_index_has_one_file_per_store_for_the_date(monkeypatch):
     assert sorted(files) == ["02010", "02044", "02066"]
     assert files["02044"][0].endswith("T120000.xlsx")
     assert files["02044"][1] == {
+        "store_id": "02044",
         "store_type": "prodavaonica",
         "street_address": "ČIKOLE 2",
         "city": "DRNIŠ",
@@ -133,6 +132,56 @@ def test_index_reads_the_old_file_name(monkeypatch):
     assert info["zipcode"] == ""
 
 
+def test_index_reads_the_file_name_from_2026_11_24(monkeypatch):
+    oib = "11279847062"
+    crawler = _crawler(
+        monkeypatch,
+        f"{oib}#PRODAVAONICA#ČIKOLE_2_22320_DRNIŠ#02044#ROBA#26329#20261125_0306.csv",
+        f"{oib}#PRODAVAONICA#ČIKOLE_2_22320_DRNIŠ#02044#ROBA#26330#20261126_0307.csv",
+        f"{oib}#PRODAVAONICA#ČIKOLE_2_22320_DRNIŠ#02044#ROBA#26330#20261126_1200.csv",
+        f"{oib}#PRODAVAONICA#PUT_GAĆELEZA_5A_22211_VODICE#02010#USLUGA#26330#20261126_0305.csv",
+        f"{oib}#PRODAVAONICA#PUT_BILOSTANA_1#02066#ROBA#26330#20261126_0308.csv",
+        f"{oib}#FRIZERSKI_SALON#PUT_GAĆELEZA_5A_22211_VODICE#08001#ROBA#26330#20261126_0309.csv",
+    )
+
+    files = {
+        info["store_id"]: (unquote(url), info)
+        for url, info in crawler.get_index(datetime.date(2026, 11, 26))
+    }
+
+    assert sorted(files) == ["02044", "02066"]
+    assert files["02044"][0].endswith("_1200.csv")
+    assert files["02044"][1] == {
+        "store_id": "02044",
+        "store_type": "prodavaonica",
+        "street_address": "ČIKOLE 2",
+        "city": "DRNIŠ",
+        "zipcode": "22320",
+    }
+    assert files["02066"][1]["street_address"] == "PUT BILOSTANA 1"
+    assert files["02066"][1]["city"] == ""
+
+
+def test_csv_from_2026_11_24_has_no_store_columns():
+    text = (
+        "Naziv artikla;Šifra artikla;Marka;Neto količina;Jedinica mjere;"
+        "MP cijena;Akcija;Cijena za jedinicu mj.;Barkod;EAN barkod;Bazna cijena\n"
+        "ČOKOLADA MARS 51G;010001;;0,051 kg;KOMAD;1,29;Da;25,29;"
+        "5900951311321;5900951311321;1,09\n"
+        "\n"
+    )
+    info = {"store_id": "02044", "store_type": "prodavaonica", "city": "DRNIŠ"}
+
+    store, [product] = DjeloVodiceCrawler().parse_csv_file(text, info)
+
+    assert (store.store_id, store.city) == ("02044", "DRNIŠ")
+    assert str(product.price) == "1.29"
+    assert str(product.special_price) == "1.29"
+    assert str(product.anchor_price) == "1.09"
+    assert product.anchor_price_date is None
+    assert (product.unit, product.quantity) == ("KOMAD", "0,051 kg")
+
+
 def test_index_without_files_for_the_date_raises(monkeypatch):
     crawler = _crawler(
         monkeypatch,
@@ -145,13 +194,14 @@ def test_index_without_files_for_the_date_raises(monkeypatch):
 
 def test_store_comes_from_the_file_name():
     info = {
+        "store_id": "02044",
         "store_type": "prodavaonica",
         "street_address": "ČIKOLE 2",
         "city": "DRNIŠ",
         "zipcode": "22320",
     }
 
-    store, _ = DjeloVodiceCrawler().parse_excel(_xlsx(store_id="02044"), info)
+    store, _ = DjeloVodiceCrawler().parse_excel(_xlsx(), info)
 
     assert store.store_id == "02044"
     assert store.store_type == "prodavaonica"
@@ -161,7 +211,11 @@ def test_store_comes_from_the_file_name():
 
 
 def test_stores_map_overrides_the_file_name():
-    info = {"store_type": "supermarket", "street_address": "PUT GA?ELEZA 5A"}
+    info = {
+        "store_id": "02010",
+        "store_type": "supermarket",
+        "street_address": "PUT GA?ELEZA 5A",
+    }
 
     store, _ = DjeloVodiceCrawler().parse_excel(_xlsx(), info)
 

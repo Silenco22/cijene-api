@@ -110,6 +110,43 @@ Crawler prima opcije `-l` za listanje podržanih trgovačkih lanaca, `-d` za
 odabir datuma (default: trenutni dan), `-c` za odabir lanaca (default: svi) te
 `-h` za ispis pomoći.
 
+### Dnevno preuzimanje
+
+`crawler.cli.daily` preuzima podatke za jedan datum tako da pokreće crawler za
+sve lance istovremeno, svaki lanac u zasebnom procesu. Podaci ostaju u
+`ROOT/data/DATUM/` između pokretanja, pa svako sljedeće pokretanje ponovno
+preuzima samo lance čiji podaci nedostaju ili su nepotpuni. Lanac je potpun kad
+je svaki od brojeva trgovina, proizvoda i cijena barem 90% očekivanog broja iz
+tablice `EXPECTED` u `crawler/cli/daily.py` (tablicu treba ručno ažurirati kad
+lanac otvori ili zatvori trgovine). Novi pokušaj se sprema u
+`ROOT/staging/DATUM/` i zamjenjuje postojeće podatke lanca samo ako ima više
+podataka (uspoređuje se broj cijena, pa trgovina, pa proizvoda). Proces koji
+radi dulje od 3 sata se prekida. Kad se podaci promijene, `run` ponovno izradi
+`DATUM.zip` u privremenu datoteku i preimenuje je, tako da se djelomična
+arhiva nikad ne vidi. Ako za datum postoji ZIP, a ne postoje podaci, `run`
+počinje od ZIP-a. Izlaz svakog lanca je u `ROOT/logs/DATUM/<lanac>.log`, a
+tablica stanja na kraju ide na stdout. `run` završava s kodom 1 ako nakon
+pokretanja ne postoji ZIP (nijedan lanac nema podatke). Vršna potrošnja
+memorije po lancu prikazuje se samo na Linuxu i macOS-u.
+
+```bash
+# Preuzimanje za danas (ili -d YYYY-MM-DD); ZIP ide u ROOT ili u --archive-dir
+uv run -m crawler.cli.daily run /path/to/root/ --archive-dir /path/to/archives/
+
+# Samo određeni lanci
+uv run -m crawler.cli.daily run /path/to/root/ -c konzum,lidl
+
+# Ponovno preuzimanje lanca iako je potpun; novi rezultat zamjenjuje stari
+# ako ima barem jednu trgovinu
+uv run -m crawler.cli.daily run /path/to/root/ --force konzum
+
+# Stanje za datum, bez preuzimanja (--json za strojno čitljiv ispis)
+uv run -m crawler.cli.daily status /path/to/root/ -d YYYY-MM-DD --json
+
+# Brisanje podataka, logova i pokušaja starijih od 7 dana (ZIP arhive ostaju)
+uv run -m crawler.cli.daily cleanup /path/to/root/ --keep-days 7
+```
+
 ### Pokretanje u Windows okolini
 
 **Napomena:** Za Windows korisnike - postavite vrijednost `PYTHONUTF8` environment varijable na `1` ili pokrenite python s `-X utf8` flag-om kako bi izbjegli probleme s character encodingom. Više detalja [na poveznici](https://github.com/senko/cijene-api/issues/9#issuecomment-2911110424).

@@ -20,34 +20,34 @@ class NtlCrawler(BaseCrawler):
     CHAIN = "ntl"
     BASE_URL = "https://ntl.hr/cjenik/"
 
-    # Regex to parse store information from the filename
-    # Format: Supermarket_Ljudevita Gaja 1_DUGA RESA_10103_263_25052025_07_22_36.csv
-    # The street address can itself contain underscores (e.g. "Calinec 179_b",
-    # where the source has a slash), so the pattern is anchored on the
-    # fixed-format tail and the address takes whatever is left.
-    STORE_FILENAME_PATTERN = re.compile(
-        r"(?P<store_type>[^_]+)_(?P<street_address>.+)_(?P<city>[^_]+)_(?P<store_id>\d+)_\d+_\d{8}_\d{2}_\d{2}_\d{2}\.csv$"
-    )
-
-    # Publication date (DDMMYYYY) and time from the same filename. Used to check
-    # that the index really served the date we asked for, since the date is a
-    # query parameter and a silently ignored one would file another day's prices
-    # under the requested date.
-    FILENAME_DATE_PATTERN = re.compile(
-        r"_(\d{8})_\d{2}_\d{2}_\d{2}\.csv$", re.IGNORECASE
-    )
-
-    # Since 2026-11-24 the names start with the chain's OIB, carry "cjenik_robe"
-    # and a counter after the store ID, and end in YYYYMMDD_HHMM:
-    # 78344221376_Minimarket_K.TOMISLAVA 188_BELISCE_20508_cjenik_robe_31000_20261124_0428.csv
-    # Store type, address, city and store ID are the same as in the old names.
-    NEW_STORE_FILENAME_PATTERN = re.compile(
-        r"\d{11}_(?P<store_type>[^_]+)_(?P<street_address>.+)_(?P<city>[^_]+)_(?P<store_id>\d+)_cjenik_robe_\d+_\d{8}_\d{4}\.csv$",
-        re.IGNORECASE,
-    )
-    NEW_FILENAME_DATE_PATTERN = re.compile(
-        r"_cjenik_robe_\d+_(\d{8})_\d{4}\.csv$", re.IGNORECASE
-    )
+    # Store information and publication date from the filename, with the
+    # strptime format of the date. The street address can itself contain
+    # underscores (e.g. "Calinec 179_b", where the source has a slash), so the
+    # patterns are anchored on the fixed-format tail and the address takes
+    # whatever is left. The index serves the last 30 days, so both formats
+    # stay in use for a while.
+    FILENAME_PATTERNS = [
+        # Since 2026-11-24:
+        # 78344221376_Supermarket_Frana Galovica 11A_KRAPINA_10101_cjenik_robe_31601_20261126_0202.csv
+        (
+            re.compile(
+                r"^\d+_(?P<store_type>[^_]+)_(?P<street_address>.+)_(?P<city>[^_]+)_"
+                r"(?P<store_id>\d+)_cjenik_robe_\d+_(?P<date>\d{8})_\d{4}\.csv$",
+                re.IGNORECASE,
+            ),
+            "%Y%m%d",
+        ),
+        # Until 2026-11-23:
+        # Supermarket_Ljudevita Gaja 1_DUGA RESA_10103_263_25052025_07_22_36.csv
+        (
+            re.compile(
+                r"^(?P<store_type>[^_]+)_(?P<street_address>.+)_(?P<city>[^_]+)_"
+                r"(?P<store_id>\d+)_\d+_(?P<date>\d{8})_\d{2}_\d{2}_\d{2}\.csv$",
+                re.IGNORECASE,
+            ),
+            "%d%m%Y",
+        ),
+    ]
 
     # The index keeps the last 30 days, as the page itself states.
     RETENTION_DAYS = 30
@@ -62,8 +62,8 @@ class NtlCrawler(BaseCrawler):
         # NTL dropped the reference date from the header entirely, where
         # Gavranović and Trgovina Krk spell it out; the values themselves are
         # still mostly the 2.5.2025 anchor, so neither spelling tells us which
-        # reference date a given row refers to.
-        # Renamed again to "Bazna cijena" on 2026-11-24 (NN 132/2026).
+        # reference date a given row refers to. Renamed to "Bazna cijena" by
+        # 2026-11-24 (NN 132/2026).
         "anchor_price": (
             ["Sidrena cijena na 2.5.2025", "Sidrena cijena", "Bazna cijena"],
             False,
@@ -128,28 +128,34 @@ class NtlCrawler(BaseCrawler):
 
         return list(set(urls))  # Return unique URLs
 
-    def filename_date(self, url: str) -> datetime.date | None:
+    def match_filename(self, url: str) -> tuple[re.Match[str], str] | None:
         """
-        Read the publication date out of a CSV filename.
+        Match a CSV URL's filename against the known formats.
 
-        The date is the second-to-last group before the time, e.g.
-        Supermarket_Ljudevita Gaja 1_DUGA RESA_10103_263_25052025_07_22_36.csv
-        is 25.05.2025. Names in the format used since 2026-11-24 carry YYYYMMDD
-        instead. Returns None if the filename doesn't carry a usable date.
+        Returns:
+            The match and the strptime format of its date, or None if no
+            format matches.
         """
         filename = unquote(os.path.basename(url))
-        for pattern, date_format in (
-            (self.NEW_FILENAME_DATE_PATTERN, "%Y%m%d"),
-            (self.FILENAME_DATE_PATTERN, "%d%m%Y"),
-        ):
-            match = pattern.search(filename)
+        for pattern, date_format in self.FILENAME_PATTERNS:
+            match = pattern.match(filename)
             if match:
-                break
-        else:
+                return match, date_format
+        return None
+
+    def filename_date(self, url: str) -> datetime.date | None:
+        """
+        Read the publication date out of a CSV filename, e.g. 2026-11-26 from
+        ..._KRAPINA_10101_cjenik_robe_31601_20261126_0202.csv. Returns None if
+        the filename doesn't carry a usable date.
+        """
+        matched = self.match_filename(url)
+        if not matched:
             return None
 
+        match, date_format = matched
         try:
-            return datetime.datetime.strptime(match.group(1), date_format).date()
+            return datetime.datetime.strptime(match["date"], date_format).date()
         except ValueError:
             return None
 
@@ -158,7 +164,7 @@ class NtlCrawler(BaseCrawler):
         Extracts store information from a CSV download URL.
 
         Example URL:
-        https://www.ntl.hr/csv_files/Supermarket_Ljudevita Gaja 1_DUGA RESA_10103_263_25052025_07_22_36.csv
+        https://ntl.hr/uploads/csv/78344221376_Supermarket_Frana%20Galovica%2011A_KRAPINA_10101_cjenik_robe_31601_20261126_0202.csv
 
         Args:
             url: CSV download URL with store information in the filename
@@ -168,15 +174,12 @@ class NtlCrawler(BaseCrawler):
         """
         logger.debug(f"Parsing store information from NTL URL: {url}")
 
-        filename = unquote(os.path.basename(url))
-
-        match = self.NEW_STORE_FILENAME_PATTERN.match(
-            filename
-        ) or self.STORE_FILENAME_PATTERN.match(filename)
-        if not match:
+        matched = self.match_filename(url)
+        if not matched:
+            filename = unquote(os.path.basename(url))
             raise ValueError(f"Invalid CSV filename format for NTL: {filename}")
 
-        data = match.groupdict()
+        data = matched[0].groupdict()
 
         store_type = data["store_type"].lower()
         street_address = data["street_address"]

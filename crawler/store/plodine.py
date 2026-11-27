@@ -48,8 +48,7 @@ class PlodineCrawler(BaseCrawler):
             False,
         ),
         "best_price_30": ("Najniza cijena u poslj. 30 dana", False),
-        # Renamed to "Bazna cijena" on 2026-11-24 (NN 132/2026). The values are
-        # the same: all 6.2M rows of 23.11. and 24.11. match.
+        # Renamed to "Bazna cijena" by 2026-11-24 (NN 132/2026)
         "anchor_price": (
             ["Sidrena cijena na 2.5.2025", "Sidrena cijena", "Bazna cijena"],
             False,

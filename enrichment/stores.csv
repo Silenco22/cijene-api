@@ -886,3 +886,618 @@ id,chain_code,code,type,address,city,zipcode,lat,lon,phone
 647,lidl,199,supermarket,Žedno - Drage 15,Supetar,21400,43.37972,16.56099,
 121,konzum,1312,supermarket,Maksimilijana Benkovića 24,Nova Gradiška,35400,45.2572724,17.3838235,+385800400000
 ,djelo_vodice,02066,prodavaonica,Put Bilostanova 1,Krković,22214,43.9033419,15.806208,
+,pivac,T001,mesnica,Hrvatskih velikana 49,Vrgorac,21276,43.2050326,17.3688096,+385914644700
+,pivac,T004,market_mesnica,Vladimira Nazora 41,Ploče,20340,43.0538073,17.4355107,+385914644701
+,pivac,T016,premium_mesnica,Ante Starčevića 2,Benkovac,23420,44.0330952,15.6117418,+385914644705
+,pivac,T017,market_mesnica,Hrvatskih velikana 4,Supetar,21400,43.2858425,16.6789667,+385914644706
+,pivac,T018,mesnica,Pujanke 24,Split,21000,43.5168703,16.4735777,+385914644707
+,pivac,T019,mesnica,Vinkovačka 6,Split,21000,43.5144768,16.4545028,+385914644708
+,pivac,T022,mesnica,Resičina 2,Knin,22300,44.0418017,16.1961366,+385914644709
+,pivac,T027,mesnica,Narodni trg 9,Pula,52100,44.8664532,13.8494548,+385914644711
+,pivac,T031,mesnica,Put Murvice 33,Zadar,23000,44.1131564,15.2500533,+385914644712
+,pivac,T034,market_mesnica,Trg hrvatskih velikana 1,Biograd na Moru,23210,43.9368786,15.4432312,+385914644714
+,pivac,T036,market_mesnica,Artina 1,Vodice,22211,43.7593451,15.7789233,+385914644717
+,pivac,T038,mesnica,Zrinsko-frankopanska 1,Zadar,23000,44.1101389,15.2357171,+385914644718
+,pivac,T042,mesnica,Put Petrića 51,Zadar,23000,44.1294489,15.2308468,+385914644719
+,pivac,T047,mesnica,Trg kralja Tomislava 3,Dugi Rat,21315,43.4451586,16.6392108,+385914644760
+,pivac,T051,market_mesnica,Jelsa 354,Jelsa,21465,43.161874,16.6922397,+385914644849
+,pivac,T053,market_mesnica,Trg Marka Miličića 4,Hvar,21450,43.1729478,16.4411136,+385914644724
+,pivac,T064,mesnica,Obala Stjepana Radića 19,Dubrovnik,20000,42.6563438,18.088295,+385914644730
+,pivac,T065,mesnica,Don Radovana Jerkovića 1,Metković,20350,43.0541952,17.6465036,+385914644731
+,pivac,T078,mesnica,Benka Benkovića 1,Zadar,23000,44.1257263,15.23509,+385914644734
+,pivac,T079,mesnica,Stari pazar 12,Split,21000,43.5076439,16.4412188,+385914644735
+,pivac,T082,market_mesnica,Zrinsko-Frankopanska 46,Makarska,21300,43.2915252,17.0275582,+385914644736
+,pivac,T084,mesnica,Šetalište stare Isse 19,Vis,21480,43.0421754,16.1933837,+385914644737
+,pivac,T085,market_mesnica,Put Malog Stona 1,Ston,20230,42.83878,17.6985307,+385914644738
+,pivac,T087,mesnica,Bruna Bušića 27,Imotski,21260,43.4451718,17.2190301,+385914644740
+,pivac,T088,market_mesnica,Ulica bana Josipa Jelačića 64A,Šibenik,22000,43.7433958,15.8951069,+385914644741
+,pivac,T089,mesnica,Ulica bana Josipa Jelačića 69,Orebić,20250,42.9760376,17.1711334,+385914644742
+,pivac,T092,mesnica,Ulica dr. Franje Tuđmana 13,Cista Provo,21256,43.5324258,16.947666,+385914644744
+,pivac,T094,market_mesnica,Put Ferate 1,Sinj,21230,43.7006199,16.6443001,+385914644746
+,pivac,T096,mesnica,Put Suvaje 2,Donji Proložac,21264,43.4672022,17.150211,+385914644748
+,pivac,T098,mesnica,Hrvoja Vukčića Hrvatinića 25,Vrlika,21236,43.9068871,16.402207,+385914644750
+,pivac,T101,market_mesnica,Obrovačka 1,Gračac,23440,44.298352,15.8411727,+385914644752
+,pivac,T103,mesnica,Trg Branislava Deškovića 3,Pučišća,21412,43.3476866,16.7311194,+385914644753
+,pivac,T104,mesnica,Stanka Parmaća 10,Opuzen,20355,43.0165721,17.5607668,+385914644754
+,pivac,T108,mesnica,Lumbarajska cesta 4,Korčula,20260,42.9452175,17.1407644,+385914644757
+,pivac,T109,mesnica,Obala 4 br. 15,Vela Luka,20270,42.9591667,16.7122294,+385914644758
+,pivac,T115,market_mesnica,Podkuća 5,Grohote,21430,43.3917977,16.2811207,+385914644763
+,pivac,T116,mesnica,Domovinskog rata 21,Trilj,21240,43.6218969,16.732946,+385914644764
+,pivac,T117,market_mesnica,Cesta dr. Franje Tuđmana 1058,Kaštel Novi,21216,43.5494739,16.3274035,+385914644765
+,pivac,T120,market_mesnica,Alojzija Stepinca 1,Otok,21238,43.6858652,16.7339648,+385914644768
+,pivac,T124,market_mesnica,Kneza Branimira 10,Metković,20350,43.0589712,17.648605,+385914644772
+,pivac,T128,premium_mesnica,Put kapelice 1,Trogir,21220,43.516387,16.2501894,+385914644775
+,pivac,T129,mesnica,Trg dr. Franje Tuđmana 2,Blato,20271,42.9439694,16.7942405,+385914644776
+,pivac,T130,market_mesnica,Strossmayerova 15,Selca,21425,43.2918611,16.8339468,+385914644777
+,pivac,T132,mesnica,Ulica dr. Franje Tuđmana 37,Zagvozd,21270,43.3972461,16.9850752,+385914644779
+,pivac,T134,mesnica,Gruda 140,Gruda,20215,42.5176369,18.3713844,+385914644780
+,pivac,T137,mesnica,Braće Andrijića 2,Pag,23250,44.4420578,15.0621476,+385914644783
+,pivac,T138,mesnica,Privlaka Grbići 67,Privlaka,23233,44.2671146,15.1358986,+385914644784
+,pivac,T139,mesnica,Slatinska 36,Novalja,53291,44.5504752,14.8857422,+385914644785
+,pivac,T140,mesnica,Ivana Gorana Kovačića 4,Posedarje,23242,44.2102989,15.4769409,+385914644786
+,pivac,T141,mesnica,Ruminja vrata 1,Senj,53270,44.99,14.901,+385914644787
+,pivac,T142,mesnica,Aleja skradinskih svilara 15,Skradin,22222,43.8192472,15.9239222,+385914644782
+,pivac,T144,mesnica,Ante Starčevića 1,Obrovac,23450,44.2008478,15.6834227,+385914644790
+,pivac,T147,mesnica,Kralja Tomislava 20,Trpanj,20240,43.0088539,17.269209,+385914644793
+,pivac,T153,mesnica,Cesta dr. Franje Tuđmana 238,Kaštel Sućurac,21212,43.5468538,16.42583,+385914644799
+,pivac,T154,market_mesnica,Zagrebačka 41,Korenica,53230,44.75031,15.70278,+385914644800
+,pivac,T155,mesnica,Trg hrvatskih branitelja 2,Karlovac,47000,45.4886625,15.5471737,+385914644801
+,pivac,T156,mesnica,Ulica kralja Zvonimira 1,Karlovac,47000,45.4815179,15.5530814,+385914644802
+,pivac,T159,mesnica,Plitvička 10,Slunj,47240,45.1128184,15.5847337,+385914644805
+,pivac,T160,mesnica,Vladimira Nazora 5,Ogulin,47300,45.2652964,15.2246129,+385914644806
+,pivac,T161,mesnica,Seljačke bune 3,Knin,22300,44.0399063,16.19876,+385914644807
+,pivac,T162,mesnica,Ulica bana Josipa Jelačića 2,Otočac,53220,44.8686074,15.2313835,+385914644808
+,pivac,T165,mesnica,Stjepana i Antuna Radića 17,Sisak,44000,45.4872162,16.3723854,+385914644938
+,pivac,T168,mesnica,Stjepana Radića 4,Udbina,53234,44.5316887,15.7659259,+385914644814
+,pivac,T169,market_mesnica,Benkovačka cesta 4,Zadar,23000,44.1039627,15.2665886,+385914644815
+,pivac,T171,market_mesnica,Uz stari put 8,Zvekovica,20210,42.5781473,18.2383561,+385914644819
+,pivac,T172,market_mesnica,Selce 33,Karlovac,47000,45.5114321,15.5549061,+385914644817
+,pivac,T177,mesnica,Vladimira Nazora 22,Ploče,20340,43.0528339,17.4366045,+385914644826
+,pivac,T178,market_mesnica,Od Izvora 76,Mokošica,20236,42.67627,18.1076588,+385914644773
+,pivac,T182,mesnica,Jadranska 67,Gradac,21330,43.1063034,17.3425641,+385914644859
+,pivac,T184,benzinska_postaja,Šetalište Mate Raosa 5,Vrgorac,21276,43.2032925,17.3781341,+385914644605
+,pivac,T185,mesnica,Hrvatskih mučenika 18,Komiža,21485,43.0452738,16.0898217,+385914644835
+,pivac,T187,mesnica,Andrije Hebranga 18,Vojnić,47220,45.32495,15.69283,+385914644836
+,pivac,T188,mesnica,Stjepana i Antuna Radića 5,Glina,44400,45.3402178,16.0893367,+385914644837
+,pivac,T189,mesnica,Lujzijanska cesta 49,Delnice,51300,45.3927605,14.798037,+385914644838
+,pivac,T190,market_mesnica,Ulica Križnog puta 2,Vrginmost,44410,45.3561902,15.8643016,+385914644811
+,pivac,T194,market_mesnica,Ivana Gorana Kovačića 8,Donji Lapac,53250,44.5545177,15.9580444,+385914644853
+,pivac,T196,mesnica,Prisoje 44,Dicmo,21232,43.6311875,16.604999,+385914644723
+,pivac,T203,mesnica,Trg sv. Nikole 2,Kistanje,22305,43.981047,15.9624796,+385914644858
+,pivac,T209,mesnica,Jozefinska cesta 4,Duga Resa,47250,45.44958,15.500296,+385914644871
+,pivac,T211,mesnica,Šimuna Kožičića Benje 3,Ugljan,23275,44.1309379,15.1058082,+385914644842
+,pivac,T214,mesnica,Turanj 4,Turanj,47000,45.4626642,15.5677966,+385914644869
+,pivac,T215,market_mesnica,Trg bana Josipa Jelačića 2,Topusko,44415,45.2930394,15.9674039,+385914644870
+,pivac,T216,mesnica,Kraj sv. Marije 8,Split,21000,43.5092626,16.4374191,+385914644851
+,pivac,T217,mesnica,Tržnica Draga 2,Šibenik,22000,43.7350196,15.8952045,+385914644733
+,pivac,T218,market_mesnica,Ulica Gordana Lederera 64,Hrvatska Kostajnica,44430,45.2308429,16.5310108,+385914644857
+,pivac,T222,mesnica,Zrinski trg 11,Kraljevica,51260,45.2738775,14.5686982,+385914644924
+,pivac,T225,market_mesnica,Rakovica 42,Rakovica,47245,44.994817,15.6506872,+385914644791
+,pivac,T228,mesnica,Ulica Mate Vladića 1,Makarska,21300,43.3339279,17.0042002,+38521691688
+,pivac,T231,mesnica,Kralja Zvonimira 76,Solin,21210,43.5377315,16.4892735,+385914644873
+,pivac,T232,market_mesnica,Zagrebačka 32,Lekenik,44272,45.5871133,16.2076547,+385914644874
+,pivac,T233,mesnica,Hrvatskih velikana 4,Kamenmost,21262,43.4249522,17.1859573,+385914644875
+,pivac,T234,mesnica,Barčev trg 16,Zagreb,10020,45.777092,15.9963309,+385914644608
+,pivac,T236,market_mesnica,Frankopanska 62,Brinje,53260,44.9997905,15.1306515,+385914644049
+,pivac,T238,market_mesnica,Trg grofova Erdődyja 25,Popovača,44317,45.5702218,16.6241701,+385914644081
+,pivac,T239,mesnica,Obala Stjepana Radića 103,Komin,20344,43.0417565,17.5301671,+385914644682
+,pivac,T242,mesnica,Viškovo 147,Viškovo,51216,45.3756926,14.3839655,+385914644844
+,pivac,T246,market_mesnica,Matije Gupca 1,Sunja,44210,45.3686282,16.5644536,+385914644848
+,pivac,T251,market_mesnica,Ulica hrvatskih branitelja 6B,Vrbovsko,51326,45.3706182,15.0764197,+385914644941
+,pivac,T252,mesnica,Trg kralja Tomislava 20,Daruvar,43500,45.5921285,17.2232881,+385914644939
+,pivac,T253,market_mesnica,Andrije Hebranga 22,Pakrac,34550,45.43162,17.19424,+385914644940
+,pivac,T255,market_mesnica,Kralja Tomislava 42,Novska,44330,45.3369535,16.9726367,+385914644942
+,pivac,T256,market_mesnica,Kardinala Blaženog Alojzija Stepinca 40,Okučani,35430,45.2588532,17.2024479,+385914644943
+,pivac,T257,mesnica,Nikole Šubića Zrinskog 13,Grubišno Polje,43290,45.7025984,17.1743361,+385914644933
+,pivac,T260,mesnica,Ulica 9. rujna 1,Žminj,52341,45.1441188,13.9080444,+385914644771
+,pivac,T264,mesnica,Ivše Lebovića 13,Bjelovar,43000,45.90096,16.8437718,+385914644962
+,pivac,T267,market_mesnica,Svetog Lovre 2,Stobreč,21311,43.4994384,16.5222233,+385914644956
+,pivac,T269,market_mesnica,Ulica Ljube Babića Đalskog 15A,Stubičke Toplice,49244,45.9760146,15.9246434,+385914644978
+,pivac,T270,market_mesnica,Molizanskih Hrvata 56,Makarska,21300,43.30091,17.0151024,+385914644631
+,pivac,T272,market_mesnica,Varaždinska 199,Sračinec,42209,46.3320872,16.2689335,+385914644637
+,pivac,T273,market_mesnica,Vinička 5,Marčan,42207,46.3327991,16.1523296,+385914644638
+,pivac,T277,market_mesnica,Domovinskog rata 72,Bol,21420,43.2609121,16.6478051,+385914644639
+,pivac,T279,market_mesnica,Graničarska ulica 2,Garešnica,43280,45.5732027,16.9437731,+385914644994
+,pivac,T280,mesnica,Alojzija Stepinca 16,Ludbreg,42230,46.2508484,16.6235784,+385914644987
+,pivac,T282,market_mesnica,Ulica hrvatskih pavlina 12,Lepoglava,42250,46.20839,16.04124,+385914644611
+,pivac,T283,market_mesnica,Trg Ksavera Šandora Gjalskog 11,Zabok,49210,46.023723,15.8973893,+385914644641
+,pivac,T285,market_mesnica,Vladimira Nazora 55,Špišić Bukovica,33404,45.8623597,17.3017027,+385914644613
+,pivac,T288,market_mesnica,Novigradska 3,Virje,48326,46.0658179,16.9839512,+385914644614
+,pivac,T289,market_mesnica,Stjepana Radića 41,Đurđevac,48350,46.0391146,17.068184,+385914644603
+,pivac,T292,mesnica,Duga 88,Vinkovci,32100,45.2911132,18.7943415,+385914644690
+,pivac,T295,market_mesnica,Kralja Petra Krešimira IV 8,Otok,32252,45.1455766,18.8809131,+385914644692
+,pivac,T297,market_mesnica,Hum na Sutli 160,Hum na Sutli,49231,46.2224165,15.7001681,+385914644880
+,pivac,T298,market_mesnica,Golubovečka 6,Donja Stubica,49240,45.9800954,15.9737681,+385914644881
+,pivac,T301,market_mesnica,Mlinska 25,Pleternica,34310,45.2859653,17.8032124,+385914644695
+,pivac,T304,market_mesnica,Lijepe Naše 36,Klanjec,49290,46.0486168,15.7380007,+385914644883
+,pivac,T306,market_mesnica,Josipa Čopora 2,Križ,10314,45.6669123,16.5164329,+385914644606
+,pivac,T309,mesnica,Ljudevita Gaja 29,Pitomača,33405,45.9519299,17.2327346,+385914644622
+,pivac,T310,mesnica,Rikarda Katalinića Jeretova 17,Pula,52100,44.8611156,13.8322533,+385914644679
+,pivac,T313,market_mesnica,Trakošćanska 14,Bednja,42253,46.2269107,15.9792981,+385914644501
+,pivac,T315,mesnica,Karlovačka ulica 32,Klinča Sela,10450,45.6915473,15.7332708,+385914644675
+,pivac,T316,mesnica,Zagrebačka 11,Zlatar,49250,46.090665,16.0754595,+385914644504
+,pivac,T318,mesnica,Lastovska 38,Zagreb,10000,45.7912917,15.9997528,+385914644511
+,pivac,T319,mesnica,Janka Leskovara 39,Pregrada,49218,46.1560371,15.7542488,+385914644503
+,pivac,T322,mesnica,Trg fra Bonifacija Gerbera 9,Virovitica,33000,45.8357767,17.386754,+385914644624
+,pivac,T323,market_mesnica,Trg sv. Josipa 5,Slatina,33520,45.701905,17.7017555,+385914644506
+,pivac,T324,market_mesnica,Zagrebačka ulica 2,Čakovec,40000,46.3831614,16.4256641,+385915582763
+,pivac,T326,market_mesnica,Uska 1,Čakovec,40000,46.388977,16.4376175,+385916464517
+,pivac,T329,market_mesnica,Varaždinska 10,Nedelišće,40305,46.3741643,16.3752119,+385914644521
+,pivac,T335,mesnica,Koledinečka ulica 1,Zagreb,10040,45.83138,16.05807,+385914644527
+,pivac,T339,market_mesnica,Kolodvorska 48,Donji Kraljevec,40320,46.3667936,16.647131,+385914644534
+,pivac,T340,mesnica,Uz Jadransku cestu 17,Mokošica,20236,42.6754307,18.0970103,+385914644513
+,pivac,T344,mesnica,Trg dr. Franje Tuđmana 3,Čačinci,33514,45.60017,17.867506,+385914644532
+,pivac,T346,market_mesnica,Trg Republike Hrvatske 1,Varaždinske Toplice,42223,46.208735,16.4207049,+385914644514
+,pivac,T347,mesnica,Ulica Josipa Broza Tita 10,Mursko Središće,40315,46.5126588,16.4364423,+385914644518
+,pivac,T349,market_mesnica,Glavna ulica 19,Mala Subotica,40321,46.3746242,16.5232821,+385914644535
+,pivac,T350,mesnica,Ulica kralja Tomislava 12,Čazma,43240,45.7478078,16.6140191,+385914644509
+,pivac,T355,mesnica,Gorjani 3,Ivankovo,32281,45.2877028,18.6833725,+385914644543
+,pivac,T360,mesnica,Trg sv. Jurja 9,Desinić,49216,46.1485326,15.6680119,+385914644632
+,pivac,T361,mesnica,Veloselska 20,Mali Lošinj,51550,44.5339389,14.4715733,+385914644762
+,pivac,T367,mesnica,Ulica kralja Petra Krešimira IV 9,Kutina,44320,45.4790075,16.7768102,+385914644628
+,pivac,T369,market_mesnica,Ulica braće Radić 32,Oriovac,35250,45.1671004,17.7490345,+385914644694
+,pivac,T375,mesnica,Ulica Republike Hrvatske 46,Kutjevo,34340,45.4218025,17.8791461,+385914644769
+,pivac,T377,market_mesnica,Trg bana Josipa Jelačića 30,Velika,34330,45.43757,17.66601,+385914644510
+,pivac,T378,market_mesnica,Ulica baruna Trenka 22,Nova Kapela,35410,45.1944442,17.6461887,+385914644696
+,pivac,T379,market_mesnica,Kralja Tomislava 13,Kloštar Podravski,48362,45.9736506,17.14153,+385914644156
+,pivac,T382,mesnica,Slaviše Vajnera Čiče 7,Rijeka,51000,45.3302893,14.4350943,+385914644587
+,pivac,T383,mesnica,Kašinska 4,Sesvete,10360,45.8279961,16.1092209,+385914644798
+,pivac,T384,market_mesnica,Braće Radića 99,Našice,31500,45.4923825,18.1032004,+385914644995
+,pivac,T385,market_mesnica,Sibinjskih žrtava 4,Sibinj,35252,45.1905373,17.9082392,+385914644795
+,pivac,T390,market_mesnica,Otrić-Seoci 90,Otrić-Seoci,20342,43.1538765,17.4227576,+385914644932
+,pivac,T391,mesnica,Kneza Trpimira 20,Tugare,,43.4723398,16.6482861,+385914644778
+,pivac,T392,mesnica,Runovići 335,Runovići,21261,43.3614597,17.1591684,+385914644720
+,pivac,T394,mesnica,Dovnja luka 4,Lastovo,20290,42.767151,16.8935853,+385914644797
+,pivac,T396,mesnica,Josipa Kosora 22,Dubrovnik,20000,42.6469567,18.0800696,+385914644850
+,pivac,T397,mesnica,Trg Stjepana Radića 11,Pisarovina,10451,45.5855689,15.8578708,+385914644015
+,pivac,T398,market_mesnica,Kralja Tomislava 20,Davor,35425,45.1130305,17.5097752,+385914644016
+,pivac,T399,minimarket,Zavojane 165,Zavojane,21275,43.2398785,17.2206731,+385914644965
+,pivac,T400,mesnica,Sv. Mihovila 52,Trilj,21240,43.6190121,16.7222787,+385914644925
+,pivac,T402,mesnica,Janjina 144,Janjina,20246,42.92452,17.43049,+385914644620
+,pivac,T403,mesnica,Matije Gupca 9,Stari Mikanovci,32284,45.284683,18.5519916,+385914644084
+,pivac,T407,mesnica,Put II. dalmatinske brigade 7,Staševica,20345,43.1397562,17.4263304,+385914644710
+,pivac,T408,market_mesnica,Vladimira Nazora 99,Petrijanec,42206,46.345101,16.2295622,+385914644691
+,pivac,T409,market_mesnica,Trg hrvatskih branitelja 13,Petrinja,44250,45.441275708148,16.280208961242,+385914644619
+,pivac,T410,market_mesnica,Splitska 56,Metković,20350,43.0443278,17.6210802,+385914644821
+,pivac,T411,market_mesnica,Vukovarska 40,Omiš,21310,43.4439248,16.6841555,+385914644745
+,pivac,T412,market_mesnica,Ulica kneza Ljudevita Posavskog 11,Vrbanja,32254,44.9805413,18.925081,+385914644861
+,pivac,T413,market_mesnica,Trg hrvatskih branitelja 22,Rovišće,43212,45.9465554,16.7328277,+385914644868
+,pivac,T414,market_mesnica,Ulica fra Ivana Rožića 44,Vrgorac,21276,43.2037629,17.378967,+385914644818
+,pivac,T415,market_mesnica,Ulica kralja Tomislava 4,Cerna,32272,45.1881022,18.6849268,+385914644895
+,pivac,T416,market_mesnica,Josipa Glibušića 4,Dalj,31226,45.483304,18.9822647,+385914644803
+,pivac,T419,market_mesnica,Bočaki 1,Konjščina,49282,46.0531,16.1675,+385914644536
+,pivac,T420,market_mesnica,Osječka 20,Jakšić,34308,45.3577186,17.7618626,+385914644545
+,pivac,T421,market_mesnica,Zagrebačka ulica 4,Dubrava,10342,45.8388936,16.5349346,+385914644607
+,pivac,T422,market_mesnica,Ulica Mile Blaževića Čađe 6,Dvor,44440,45.069101,16.377134,+385914644548
+,pivac,T423,market_mesnica,Ogulinska ulica 1,Josipdol,47303,45.1889335,15.2816124,+385914644086
+,pivac,T425,market_mesnica,Trg sv. Ivana 9,Kloštar Ivanić,10312,45.7385447,16.4151925,+385914644623
+,pivac,T428,market_mesnica,Ulica hrvatskog časnika Ivana Čanića Baje 1,Lički Osik,53201,44.6039118,15.4222935,+385914644813
+,bipa,P-7102,prodavaonica,Dubrava 47,Zagreb,10000,45.8285421,16.0507463,
+,bipa,P-7104,prodavaonica,Draškovićeva ulica 10,Zagreb,10000,45.8129944,15.9832775,
+,bipa,P-7106,prodavaonica,Trg Dragutina Domjanića 6,Sesvete,10360,45.8267886,16.1098544,
+,bipa,P-7107,prodavaonica,Zaprešićka 1,Zaprešić,10290,45.8713309,15.8267129,
+,bipa,P-7109,prodavaonica,Lastovska ulica 1a,Zagreb,10000,45.794451298801,15.992317360448,
+,bipa,P-7110,prodavaonica,Avenija Dubrovnik 6-8,Zagreb,10000,45.7768597,15.973069,
+,bipa,P-7112,prodavaonica,Ulica Mirka Kleščića 1,Samobor,10430,45.802327328833,15.710653066635,
+,bipa,P-7114,prodavaonica,Trg Ante Starčevića 7,Zagreb,10000,45.8051451,15.9776703,
+,bipa,P-7115,prodavaonica,Dobronićeva ulica 3,Zagreb,10090,45.792982832829,15.901215970516,
+,bipa,P-7117,prodavaonica,Zagrebačka cesta 3,Zagreb,10000,45.813491170524,15.931903123856,
+,bipa,P-7118,prodavaonica,Maksimirska cesta 123,Zagreb,10000,45.818896953949,16.012670037982,
+,bipa,P-7119,prodavaonica,Trg Ljudevita Gaja 8,Krapina,49000,46.16374788799,15.869757346809,
+,bipa,P-7121,prodavaonica,Lanište 22,Zagreb,10000,45.773277960246,15.945146530867,
+,bipa,P-7123,prodavaonica,Ulica grada Mainza 16,Zagreb,10000,45.811422541759,15.950662493706,
+,bipa,P-7125,prodavaonica,Ulica kneza Branimira 163,Zagreb,10000,45.822582691449,16.063739061356,
+,bipa,P-7127,prodavaonica,Trg hrvatskih branitelja 5,Karlovac,47000,45.48807328895,15.546030805627,
+,bipa,P-7128,prodavaonica,Donje Svetice 46,Zagreb,10000,45.802087050737,16.013587117195,
+,bipa,P-7130,prodavaonica,Trg Ivana Kukuljevića 12,Zagreb,10000,45.804253314322,15.896697789431,
+,bipa,P-7131,prodavaonica,Ulica Ivana Gundulića 4,Karlovac,47000,45.494451379457,15.551929324865,
+,bipa,P-7132,prodavaonica,Ulica dr. Franje Tuđmana 2-8,Zaprešić,10290,45.87015178915,15.794533789158,
+,bipa,P-7133,prodavaonica,Trg žrtava fašizma 9,Zagreb,10000,45.809582865189,15.988304615021,
+,bipa,P-7134,prodavaonica,Rapska ulica 33,Zagreb,10000,45.799654293531,16.001856476068,
+,bipa,P-7135,prodavaonica,Kanalski put 34,Zagreb,10000,45.793046695457,16.048528292625,
+,bipa,P-7136,prodavaonica,Ulica Vlade Gotovca 2a,Zagreb,10000,45.800267635108,15.906228348613,
+,bipa,P-7137,prodavaonica,Ulica kneza Branimira 71d,Zagreb,10000,45.8091276,16.0020455,
+,bipa,P-7138,prodavaonica,Sisačka ulica 39d,Velika Gorica,10410,45.707857547642,16.086629033089,
+,bipa,P-7139,prodavaonica,Zagrebačka ulica 9,Velika Gorica,10410,45.714788274676,16.07298463583,
+,bipa,P-7140,prodavaonica,Ulica Milana Pavelića 1a,Zagreb,10000,45.81173475726,16.018675267696,
+,bipa,P-7142,prodavaonica,Ivana Rabara 1b,Zagreb,10000,45.801506510742,15.941302925348,
+,bipa,P-7143,prodavaonica,Josipa Broza Tita 5,Zabok,49210,46.023670537893,15.905185639858,
+,bipa,P-7144,prodavaonica,Ilica 42,Zagreb,10000,45.813426000604,15.969560568088,
+,bipa,P-7146,prodavaonica,Horvaćanska cesta 37,Zagreb,10000,45.7873758,15.9490783,
+,bipa,P-7148,prodavaonica,Ulica kralja Tomislava 27,Ivanić-Grad,10310,45.7051149,16.3923577,
+,bipa,P-7149,prodavaonica,Ulica Ivane Brlić-Mažuranić 2a,Zagreb,10000,45.80665838883,15.907237699584,
+,bipa,P-7151,prodavaonica,Zagrebačka ulica 115,Vrbovec,10340,45.879449725787,16.397298574448,
+,bipa,P-7152,prodavaonica,Ulica kneza Branimira 181,Zagreb,10040,45.824934477981,16.078595860807,
+,bipa,P-7153,prodavaonica,Radnička cesta 230,Zagreb,10000,45.775681,16.0565198,
+,bipa,P-7154,prodavaonica,Ulica kneza Branimira 119c,Zagreb,10040,45.818588316886,16.041651641686,
+,bipa,P-7155,prodavaonica,Kvaternikov trg 4a,Zagreb,10000,45.814896418898,15.997957127578,
+,bipa,P-7156,prodavaonica,Ulica Velimira Škorpika 11,Zagreb,10090,45.80477470117,15.859435190208,
+,bipa,P-7158,prodavaonica,Ulica Zdeslava Turića 6,Zagreb,10000,45.787971465552,16.008181124926,
+,bipa,P-7160,prodavaonica,Ulica 144. brigade Hrvatske vojske 5,Sesvete,10360,45.815275375511,16.105672181733,
+,bipa,P-7161,prodavaonica,Lovinčićeva ulica 3d,Zagreb,10000,45.799631854077,16.019748151302,
+,bipa,P-7166,prodavaonica,Ulica Većeslava Holjevca 15,Jastrebarsko,10450,45.659615526061,15.653607845306,
+,bipa,P-7167,prodavaonica,Utinjska ulica 10b,Zagreb,10000,45.765382460262,15.963220596313,
+,bipa,P-7168,prodavaonica,Ulica Julija Knifera 6,Zagreb,10000,45.779461482623,15.982098949039,
+,bipa,P-7170,prodavaonica,Jaruščica 4,Zagreb,10000,45.769961284697,15.935006512621,
+,bipa,P-7172,prodavaonica,Osječka ulica 3,Dugo Selo,10370,45.8067318,16.2325759,
+,bipa,P-7173,prodavaonica,Ulica Ljudevita Gaja 21,Pregrada,49218,46.1601424,15.7539905,
+,bipa,P-7174,prodavaonica,Ulica hrvatskih branitelja 4,Samobor,10430,45.8138076,15.7182,
+,bipa,P-7201,prodavaonica,Zrinsko-frankopanska ulica 2,Donji Miholjac,31540,45.759098939249,18.16642999649,
+,bipa,P-7202,prodavaonica,Ulica Maksimilijana Benkovića 34,Nova Gradiška,35400,45.253165648821,17.385974960667,
+,bipa,P-7203,prodavaonica,Ulica pape Ivana Pavla II 24,Đakovo,31400,45.3086621,18.4108186,
+,bipa,P-7204,prodavaonica,Josipa Rimca 7,Slavonski Brod,35000,45.160134377981,17.997873692247,
+,bipa,P-7205,prodavaonica,Trg slobode 39,Beli Manastir,31300,45.7701659,18.5987032,
+,bipa,P-7207,prodavaonica,Trg dr. Franje Tuđmana 2,Virovitica,33000,45.832215634752,17.387087345123,
+,bipa,P-7208,prodavaonica,Josipa Jurja Strossmayera 3,Vukovar,32000,45.351760970279,19.001690187926,
+,bipa,P-7209,prodavaonica,Ulica kralja Petra Krešimira IV 14,Slavonski Brod,35000,45.155263814791,18.013637959957,
+,bipa,P-7210,prodavaonica,Kolodvorska ulica 1,Garešnica,43280,45.5733787586,16.941411469814,
+,bipa,P-7211,prodavaonica,Ulica kneza Trpimira 14,Osijek,31000,45.55016426594,18.693041503429,
+,bipa,P-7213,prodavaonica,Zagrebačka ulica 49a,Sisak,44000,45.4956589,16.3652684,
+,bipa,P-7214,prodavaonica,Ivana Fuderera Hanzike 9a,Valpovo,31550,45.650678364228,18.435444831848,
+,bipa,P-7215,prodavaonica,Trg Ante Starčevića 6,Osijek,31000,45.561484846194,18.676270832106,
+,bipa,P-7216,prodavaonica,Ulica kralja Petra Krešimira IV 4c,Kutina,44320,45.479388260432,16.774406433105,
+,bipa,P-7217,prodavaonica,Ulica Petra Svačića 2,Slavonski Brod,35000,45.1628476,18.0073495,
+,bipa,P-7218,prodavaonica,Petrinjska ulica 11a,Sisak,44000,45.4548133,16.3713875,
+,bipa,P-7219,prodavaonica,Ulica Hrvatske Republike 21,Osijek,31000,45.558176753949,18.678778798777,
+,bipa,P-7220,prodavaonica,Trg dr. Franje Tuđmana 13,Našice,31500,45.490278186629,18.092221319675,
+,bipa,P-7224,prodavaonica,Ulica kralja Zvonimira 59,Vinkovci,32100,45.2956575,18.8079637,
+,bipa,P-7225,prodavaonica,Vinkovačka ulica 2b,Županja,32270,45.079411180936,18.698202073574,
+,bipa,P-7226,prodavaonica,Ulica Josipa Jelačića 57,Daruvar,43500,45.592260188278,17.217035293579,
+,bipa,P-7227,prodavaonica,Osječka ulica 10,Požega,34000,45.339350877118,17.683246135712,
+,bipa,P-7229,prodavaonica,Ulica kralja Zvonimira 16,Slatina,33520,45.699139774687,17.707461118698,
+,bipa,P-7232,prodavaonica,Vinogradi IV 1,Petrinja,44250,45.4340531,16.2584823,
+,bipa,P-7236,prodavaonica,Svilajska ulica 35b,Osijek,31000,45.560541659787,18.638113985516,
+,bipa,P-7237,prodavaonica,Bolnička ulica 80k,Pakrac,34550,45.426746215845,17.186694145203,
+,bipa,P-7239,prodavaonica,Ulica Alojzija Stepinca 201,Vinkovci,32100,45.287480272779,18.753223030688,
+,bipa,P-7301,prodavaonica,Ulica Fiorella La Guardie 13,Rijeka,51000,45.330502276877,14.434530436993,
+,bipa,P-7302,prodavaonica,Palit 71,Rab,51280,44.761838210277,14.75998096168,
+,bipa,P-7304,prodavaonica,Ulica maršala Tita 122/3,Opatija,51410,45.334708504044,14.306247755885,
+,bipa,P-7305,prodavaonica,Trg žrtava fašizma 2,Mali Lošinj,51550,44.5318362,14.4681423,
+,bipa,P-7306,prodavaonica,Ulica braće Brozičević bb,Crikvenica,51260,45.1736146,14.6934997,
+,bipa,P-7307,prodavaonica,Osječka ulica 29,Rijeka,51000,45.339302892521,14.428335790248,
+,bipa,P-7308,prodavaonica,Ulica Pušća 150,Omišalj,51513,45.216822196687,14.565143287182,
+,bipa,P-7309,prodavaonica,Ulica Narodnog doma 1,Pazin,52000,45.2395686,13.937173,
+,bipa,P-7310,prodavaonica,Obala kralja Zvonimira 1,Senj,53270,44.9902405,14.9008635,
+,bipa,P-7312,prodavaonica,Ulica Petra Jurčića 2A,Rijeka,51000,45.3429117,14.3900014,
+,bipa,P-7313,prodavaonica,Ulica Nikole Tesle 5,Poreč,52440,45.227687,13.5959232,
+,bipa,P-7314,prodavaonica,Trg maršala Tita 12,Matulji,51211,45.363861,14.3242783,
+,bipa,P-7316,prodavaonica,Trg Petra Stipetića 1,Ogulin,47300,45.266743233595,15.225288569927,
+,bipa,P-7317,prodavaonica,Šporova jama 1a,Kastav,51215,45.37072163997,14.351941442398,
+,bipa,P-7318,prodavaonica,Trg na lokvi 8,Rovinj,52210,45.0802314,13.6388408,
+,bipa,P-7320,prodavaonica,Ulica poduzetnika 7,Umag,52470,45.431779607979,13.531760573387,
+,bipa,P-7321,prodavaonica,Vozišće 23,Viškovo,51216,45.3813149,14.3853286,
+,bipa,P-7322,prodavaonica,Ulica Rimske centurijacije 101a,Pula,52100,44.869095141529,13.867994248867,
+,bipa,P-7323,prodavaonica,Stoja 14a,Pula,52100,44.860313710243,13.824813024537,
+,bipa,P-7324,prodavaonica,Zametska ulica 44,Rijeka,51000,45.340715848106,14.398435950279,
+,bipa,P-7326,prodavaonica,Ulica Mate Vlašića 46,Poreč,52440,45.230160064465,13.621356497762,
+,bipa,P-7327,prodavaonica,Odvojak Stjepana Radića 2,Krk,51500,45.0360589,14.5669439,
+,bipa,P-7328,prodavaonica,Ulica Spine 4,Rovinj,52210,45.09010655177,13.658670776721,
+,bipa,P-7329,prodavaonica,Kukuljanovo 362,Kukuljanovo,51227,45.3333569,14.5091285,
+,bipa,P-7330,prodavaonica,Pulska ulica 2b,Labin,52220,45.0981051,14.1144126,
+,bipa,P-7331,prodavaonica,Ulica sv. Roka 15,Ogulin,47300,,,
+,bipa,P-7332,prodavaonica,Trg Portarata 6,Pula,52100,44.868252532199,13.847156114104,
+,bipa,P-7401,prodavaonica,Ulica Stjepana Radića 16,Metković,20350,43.053362,17.6512435,
+,bipa,P-7402,prodavaonica,Ulica bana Josipa Jelačića 20,Zadar,23000,44.116963689285,15.238806903362,
+,bipa,P-7403,prodavaonica,Vukovarska ulica 51-53,Split,21000,43.5113601,16.452333,
+,bipa,P-7404,prodavaonica,Obala Ive Juriceva Cota 2,Vodice,22211,43.7588401,15.7763158,
+,bipa,P-7405,prodavaonica,Glavina donja 336,Imotski,21260,43.442372360435,17.201242446899,
+,bipa,P-7406,prodavaonica,Široka ulica 3,Zadar,23000,44.1142866,15.2270861,
+,bipa,P-7407,prodavaonica,Trg dr. Franje Tuđmana 3,Split,21000,43.508585452198,16.435590703328,
+,bipa,P-7408,prodavaonica,Splitska ulica 37,Sinj,21230,43.6989208,16.6415039,
+,bipa,P-7409,prodavaonica,Ulica kralja Zvonimira 18,Makarska,21300,43.296909,17.0162041,
+,bipa,P-7410,prodavaonica,Ulica Benka Benkovića 17,Zadar,23000,44.124082248384,15.237323641777,
+,bipa,P-7411,prodavaonica,Ulica 4. gardijske brigade 42,Knin,22300,44.039585,16.2020661,
+,bipa,P-7412,prodavaonica,Ulica Ante Šupuka 10,Šibenik,22000,43.7314962,15.8975684,
+,bipa,P-7413,prodavaonica,Poljička cesta 6,Split,21000,43.5047908,16.4544875,
+,bipa,P-7414,prodavaonica,Ulica Petra Hektorovića 38c,Solin,21210,43.5326584,16.4897843,
+,bipa,P-7415,prodavaonica,Ulica Josipa Jovića 93,Split,21000,43.51966109099,16.484899898612,
+,bipa,P-7416,prodavaonica,Ulica Nikole Tesle 14c,Split,21000,43.514624782782,16.430096626282,
+,bipa,P-7417,prodavaonica,Poljana kneza Trpimira 4-6,Split,21000,43.507085943802,16.442972570658,
+,bipa,P-7418,prodavaonica,Trg Ivana Pavla II 1,Trogir,21220,43.516898808421,16.251488106729,
+,bipa,P-7419,prodavaonica,Ulica Ante Starčevića 6,Korčula,20260,42.956960380095,17.132835388184,
+,bipa,P-7420,prodavaonica,Jadranska cesta 160a,Bibinje,23205,44.061245562362,15.295871690485,
+,bipa,P-7421,prodavaonica,Lokunje 3,Novalja,53291,44.552070725808,14.884452223778,
+,bipa,P-7422,prodavaonica,Ulica Petra Zoranića 11,Benkovac,23420,44.0312716,15.6139722,
+,bipa,P-7423,prodavaonica,Ulica bana Josipa Jelačića 13,Šibenik,22000,43.745758353766,15.895819365978,
+,bipa,P-7424,prodavaonica,Ulica Ruđera Boškovića 19,Split,21000,43.508358,16.4669083,
+,bipa,P-7425,prodavaonica,Obala kralja Tomislava 16,Makarska,21300,43.2951592,17.0159751,
+,bipa,P-7426,prodavaonica,Žutska 1,Biograd na Moru,23210,43.94616317166,15.453921711431,
+,bipa,P-7427,prodavaonica,Čatrnja 172,Rakovica,47245,44.957179060797,15.640332438157,
+,bipa,P-7428,prodavaonica,Ulica kralja Stjepana Držislava 22,Split,21000,43.50674063834,16.504104137421,
+,bipa,P-7429,prodavaonica,Ulica bleiburških žrtava 17,Zadar,23000,44.11614335337,15.255406965786,
+,bipa,P-7430,prodavaonica,Velebitska ulica 143-145,Split,21000,43.503531634795,16.477193534374,
+,bipa,P-7432,prodavaonica,Ulica Nikole Tesle 2,Dubrovnik,20000,42.652784283129,18.087692750636,
+,bipa,P-7434,prodavaonica,Trogirska cesta 6,Trogir,21220,43.543031542044,16.28883682587,
+,bipa,P-7435,prodavaonica,Budačka ulica 100,Gospić,53000,44.556801192741,15.381905436516,
+,bipa,P-7438,prodavaonica,Ulica Velimira Škorpika 16,Šibenik,22000,43.708718057468,15.908927321434,
+,bipa,P-7501,prodavaonica,Ulica Augusta Šenoe 12,Varaždin,42000,46.309859085923,16.338772773743,
+,bipa,P-7502,prodavaonica,Ulica hrvatske državnosti 12,Koprivnica,48000,46.162414974119,16.826857030392,
+,bipa,P-7503,prodavaonica,Ulica grada Lipika 15,Donji Kneginec,42204,46.2636888,16.3753342,
+,bipa,P-7504,prodavaonica,Ulica kralja Tomislava 2,Čakovec,40000,46.390008037558,16.436170488596,
+,bipa,P-7505,prodavaonica,Ulica Petra Preradovića 7,Bjelovar,43000,45.896499425831,16.841631716533,
+,bipa,P-7511,prodavaonica,Trg 1. hrvatskog sveučilišta 4,Lepoglava,42250,46.210110390537,16.038145422935,
+,bipa,P-7512,prodavaonica,Ulica Rudolfa Fizira 3,Ludbreg,42230,46.24824053779,16.626460677785,
+,bipa,P-7513,prodavaonica,Ulica Tadije Smičiklasa 5a,Križevci,48260,46.0276406,16.542107,
+,bipa,P-7515,prodavaonica,Optujska ulica 72,Varaždin,42000,46.3194874,16.3143048,
+,bipa,P-7516,prodavaonica,Ulica Ivana Gorana Kovačića 16,Ivanec,42240,46.229414729508,16.121773989584,
+,bipa,P-7517,prodavaonica,Ulica Vlahe Paljetka 5a,Bjelovar,43000,45.904437571257,16.853070259094,
+,bipa,P-7518,prodavaonica,Ulica Grana 150/4,Novi Marof,42220,46.158249758481,16.333322525024,
+,bipa,P-7519,prodavaonica,Ulica Franje Glada 13,Prelog,40323,46.343402850924,16.610398772214,
+,bipa,P-7523,prodavaonica,Zagrebačka ulica 40a,Zlatar,49250,46.0870387,16.078996,
+,bipa,P-7524,prodavaonica,Stubička cesta 17e,Marija Bistrica,49246,46.0048931,16.1096354,
+,zoocity,02,trgovina,Turinina 2a,Zagreb,10000,45.7763816,15.9888167,+38517789512
+,zoocity,03,trgovina,Osječka 284,Slavonski Brod,35000,45.1733994,18.0526041,+38535258129
+,zoocity,04,trgovina,Optujska 155,Varaždin,42000,46.3174535,16.3152101,+38542303784
+,zoocity,06,trgovina,Jankomir 33,Zagreb,10000,45.7997265,15.8846814,+38515570936
+,zoocity,07,trgovina,Prilaz V. Holjevca 12,Karlovac,47000,45.5058294,15.5442216,+38547645582
+,zoocity,08,trgovina,Ul. Rudolfa Kolaka 14,Zagreb,10000,45.8369708,16.0461224,+38517897200
+,zoocity,09,trgovina,Ul. Vice Vukova 6,Zagreb,10000,45.7704026,15.9381151,+38514111381
+,zoocity,10,trgovina,Vukovarska ul. 207,Split,21000,43.5137750,16.5023389,+38521410166
+,zoocity,11,trgovina,Ul. akcije Maslenica 1,Zadar,23000,44.1170417,15.2710380,+38523326699
+,zoocity,15,trgovina,Slavonska avenija 11d,Zagreb,10000,45.8023309,16.0499517,+38512406825
+,zoocity,17,trgovina,V. Škorpika 23,Šibenik,22000,43.7134559,15.9125797,+38522341480
+,zoocity,19,trgovina,Svetojelenska cesta 25,Čakovec,40000,46.3957661,16.4279563,+38540313933
+,zoocity,22,trgovina,Gospodarska ul. 1,Koprivnica,48000,46.1456110,16.8362316,+38548864091
+,zoocity,24,trgovina,Avenija Dubrovnik 16,Zagreb,10000,45.7767808,15.9786900,+38515513814
+,zoocity,25,trgovina,Gračanska cesta 208,Zagreb,10000,45.8622290,15.9856775,+38514586036
+,zoocity,26,trgovina,Trg P. Preradovića 6/1,Zagreb,10000,45.8125217,15.9737827,+38515516121
+,zoocity,27,trgovina,Kralja Petra Krešimira IV 4,Samobor,10430,45.8017250,15.7265803,+38512316680
+,zoocity,28,trgovina,Ul. Grada Lipika 15,Donji Kneginec,42204,46.2636925,16.3727593,+38542550575
+,zoocity,29,trgovina,Ul. Rimske centurijacije 101,Pula,52100,44.8692365,13.8639526,+38552382454
+,zoocity,30,trgovina,Drinska 125,Osijek,31000,45.5512566,18.6909356,+38531659907
+,zoocity,31,trgovina,Avenija Dubrovnik 46,Zagreb,10000,45.7774224,15.9979820,+38512100738
+,zoocity,32,trgovina,Stoja 14a,Pula,52100,44.8603779,13.8250006,+38552645902
+,zoocity,33,trgovina,Nova Ves 17,Zagreb,10000,45.8203722,15.9777220,+38512230103
+,zoocity,34,trgovina,Josipa Broza Tita 5,Zabok,49210,46.0247019,15.9063182,+38549638107
+,zoocity,35,trgovina,Trogirska cesta 6,Trogir,21220,43.5397263,16.2884456,+38521214945
+,zoocity,36,trgovina,Ulica Spine 4,Rovinj,52210,45.0897252,13.6564585,+38552205830
+,zoocity,37,trgovina,Poljička 18,Split,21000,43.5048373,16.4552203,+38521243900
+,zoocity,38,trgovina,Put Brodarice 6,Split,21000,43.5194055,16.4459409,+38521243921
+,zoocity,39,trgovina,Cesta Dr. Franje Tuđmana 344,Kaštel Sućurac,21212,43.5484280,16.4129131,+38521243920
+,zoocity,40,trgovina,Ul. Rudolfa Fizira 3,Ludbreg,42230,46.2483998,16.6262756,+38542632968
+,zoocity,41,trgovina,Ulica kneza Branimira 119c,Zagreb,10000,45.8175005,16.0364792,+38516474450
+,zoocity,42,trgovina,Ul. kneza Ljudevita Posavskog 47,Velika Gorica,10410,45.7172564,16.0555255,+38516474392
+,zoocity,43,trgovina,Ul. Matije Gupca 59,Zadar,23000,44.1397194,15.2275568,+38523336096
+,zoocity,44,trgovina,Budačka ul. 100,Gospić,53000,44.5568209,15.3811330,+38553646111
+,zoocity,45,trgovina,Ul. 4.Gardijske Brigade 1,Zadar,23000,44.1123320,15.2553200,+38523551030
+,zoocity,46,trgovina,Augusta Šenoe 2B,Daruvar,43500,45.5949300,17.1990800,+38543633144
+,zoocity,47,trgovina,Kukuljanovo 362,Kukuljanovo,51227,45.3334379,14.5077561,+38551309470
+,zoocity,48,trgovina,Alojzija Stepinca 201,Vinkovci,32100,45.2884168,18.7525456,+38532616416
+,zoocity,49,trgovina,Jarušćica 4,Zagreb,10000,45.7695186,15.9404901,+38514058617
+,zoocity,50,trgovina,Štrmac 303,Labin,52220,45.1187032,14.1161848,+38552770889
+,zoocity,51,trgovina,Radnička cesta 49,Zagreb,10000,45.8031700,16.0063063,+38514058618
+,zoocity,52,trgovina,Ul. Istarskih narodnjaka 17,Pazin,52000,45.2342067,13.9217782,+38552770915
+,zoocity,53,trgovina,Ulica 34. inženjerijske bojne 2,Čakovec,40000,46.3885883,16.4488350,+38540630405
+,zoocity,54,trgovina,Grana ul. 150,Novi Marof,42220,46.1571495,16.3332002,+38542202229
+,zoocity,55,trgovina,Ulica Petra Preradovića 198,Đakovo,31400,45.2856705,18.4069924,+38531626324
+,zoocity,56,trgovina,Trg Milana Šufflaya 1,Karlovac,47000,45.4934851,15.5488552,+38547640348
+,zoocity,57,trgovina,Ivana Fistrovića 23,Sisak,44000,45.4945071,16.3785994,+38544635589
+,zoocity,58,trgovina,Ulica Josipa Rimca 7,Slavonski Brod,35000,45.1596759,17.9960510,+38535637939
+,zoocity,59,trgovina,Zagrebačka 52,Požega,34000,45.3310063,17.6481756,+38534620241
+,zoocity,60,trgovina,Zagrebačka ulica 1A,Vukovar,32000,45.3391944,19.0071048,+38532616451
+,zoocity,61,trgovina,Ulica Hrvatskog preporoda 70,Dugo Selo,10370,45.8044140,16.2276440,+38516474866
+,zoocity,62,trgovina,Ote Horvata 1,Virovitica,33000,45.8207775,17.3905161,+38533618093
+,zoocity,63,trgovina,Pristava Krapinska 63,Krapina,49000,46.1442869,15.8716461,+38549638136
+,zoocity,64,trgovina,Ulica grada Lipika 10,Donji Kneginec,42204,46.2642352,16.3761859,+38542202345
+,zoocity,65,trgovina,Svilajska ulica 35 B,Osijek,31000,45.5600622,18.6339397,+38531659048
+,zoocity,66,trgovina,Ivanečko Naselje 2/28,Ivanec,42240,46.2319868,16.1425603,+38542202348
+,zoocity,67,trgovina,Ulica kralja Petra Svačića 3,Nova Gradiška,35400,45.2546602,17.3808505,+38535640018
+,zoocity,68,trgovina,Alfreda Nobela 6,Rugvica,10370,45.7934980,16.1477480,+38516886529
+,zoocity,69,trgovina,Zagrebačka cesta 162B,Zagreb,10360,45.8271874,16.0805641,+38516887048
+,zoocity,70,trgovina,Ulica Josipa Reihl - Kira 36,Osijek,31000,45.5459534,18.7090438,+38531659352
+,zoocity,71,trgovina,Labinska ulica 51A,Rijeka,51000,45.3425454,14.3775612,+38551640797
+,zoocity,72,trgovina,Ulica bana Ivana Paližne 3,Knin,22300,44.0538210,16.2067545,+38522646999
+,zoocity,73,trgovina,Put Piketa 8,Sinj,21230,43.6982180,16.6496043,+38521243029
+,zoocity,74,trgovina,Ulica Hrvatskih branitelja 4,Samobor,10430,45.8138113,15.7156251,+38516888198
+,zoocity,76,trgovina,Pakračka ulica 11,Bjelovar,43000,45.8889303,16.8464736,+38543633474
+,zoocity,77,trgovina,Ulica Svetog Roka 15,Ogulin,47300,45.2545248,15.2331701,+38547640396
+,zoocity,webshop,webshop,,,,,,
+,petcentar,PJ1,prodavaonica,Ul. Vjekoslava Heinzela 60,Zagreb,10000,45.80843,16.00393,+38516040814
+,petcentar,PJ2,prodavaonica,Ulica kralja Petra Svačića 61,Osijek,31000,45.545136823,18.70798308,+38531580869
+,petcentar,PJ3,prodavaonica,Našička 144,Zagreb,10000,45.794343723,15.924806166,+38513013195
+,petcentar,PJ4,prodavaonica,Škurinjska cesta 1,Rijeka,51000,45.352665402,14.415441854,+38551266113
+,petcentar,PJ7,prodavaonica,Avenija Većeslava Holjevca 62,Zagreb,10000,45.757075352,15.988107454,+38516431535
+,petcentar,PJ8,prodavaonica,Put Mostina 8,Split,21000,43.525962999,16.483280879,+38521444411
+,petcentar,PJ9,prodavaonica,Martinkovac 131,Rijeka,51000,45.354849903,14.364858174,+38551629434
+,petcentar,PJ12,prodavaonica,Dubrava 256k/1,Zagreb,10000,45.827509647,16.077104989,+38516381230
+,petcentar,PJ13,prodavaonica,Medulinska cesta 1,Pula,52100,44.861776549,13.866021304,+38552205820
+,petcentar,PJ14,prodavaonica,Put Kozjaka 2,Kaštel Sućurac,21212,43.5478,16.40816,+38521243930
+,petcentar,PJ15,prodavaonica,Ljubljanska avenija 2b,Zagreb,10000,45.79839999,15.888961618,+38512830268
+,petcentar,PJ16,prodavaonica,Nova cesta 54,Zagreb,10000,45.804200067,15.95453944,+38515601983
+,petcentar,PJ17,prodavaonica,Dragutina Golika 1,Zagreb,10000,45.807479254,15.930158021,+38514058315
+,petcentar,PJ18,prodavaonica,Obala Ivana Pavla II 15,Dubrovnik,20000,42.660586929,18.085725246,+38520222353
+,petcentar,PJ19,prodavaonica,Ulica Velimira Škorpika 34,Zagreb,10000,45.795764923,15.857297914,+38514058550
+,petcentar,PJ20,prodavaonica,Ulica 144. brigade Hrvatske vojske 5,Sesvete,10360,45.814693662,16.104859596,+38514058163
+,petcentar,PJ22,prodavaonica,Velebitska 125,Split,21000,43.513270047,16.472171832,+38521243996
+,petcentar,PJ23,prodavaonica,Tomaša Goričanca 1,Čakovec,40000,46.380173038,16.443135568,+38540630402
+,petcentar,PJ24,prodavaonica,Zvonimirova ulica 3,Rijeka,51000,45.337863794,14.407809047,+38551309811
+,petcentar,PJ25,prodavaonica,Gospodarska ulica 39,Varaždin,42000,46.292524625,16.35547532,+38542202276
+,petcentar,PJ26,prodavaonica,Ul. Matice hrvatske 19,Dugopolje,21204,43.592928613,16.577659515,+38521293493
+,petcentar,PJ27,prodavaonica,Ul. Velimira Škorpika 16,Šibenik,22000,43.708791694,15.908577611,+38522646799
+,petcentar,PJ28,prodavaonica,Zagrebačka ulica 154,Dugo Selo,10370,45.809929811,16.209216568,+38516886994
+,petcentar,PJ29,prodavaonica,Ulica Julija Knifera 4,Zagreb,10000,45.779674956,15.983976242,+38516887323
+,petcentar,PJ30,prodavaonica,Ulica Ferde Rusana 12,Bjelovar,43000,45.895895388,16.847460809,
+,petcentar,PJ31,prodavaonica,Ilica 308,Zagreb,10000,45.813869441,15.927061455,
+,petcentar,PJ32,prodavaonica,Utinjska ulica 2A,Zagreb,10020,45.765453474,15.965426355,+38516887901
+,petcentar,PJ6_WEB,webshop,Kovinska 11,Zagreb,10000,,,
+,inovine,009,,,,,45.3420136,14.4143071,
+,inovine,011,,,,,45.362097,14.392881,
+,inovine,012,,,,,45.326134,14.446044,
+,inovine,013,,,,,45.3325438,14.42993269,
+,inovine,018,,,,,45.3390444,14.4149587,
+,inovine,021,,,,,45.333228,14.4388592,
+,inovine,024,,,,,45.3405531,14.4073726,
+,inovine,029,,,,,45.3248206,14.4434396,
+,inovine,030,,,,,45.3247118,14.4473874,
+,inovine,031,,,,,45.344079,14.3823445,
+,inovine,032,,,,,45.328386,14.465167,
+,inovine,034,,,,,45.3430112,14.39057579,
+,inovine,035,,,,,45.317328,14.468723,
+,inovine,038,,,,,45.3231739,14.4781237,
+,inovine,040,,,,,45.3572089,14.4882047,
+,inovine,043,,,,,45.3255894,14.4441541,
+,inovine,044,,,,,45.3210272,14.4748654,
+,inovine,046,,,,,45.3306119,14.4357142,
+,inovine,047,,,,,45.3594491,14.3969838,
+,inovine,048,,,,,45.3294651,14.4366732,
+,inovine,049,,,,,45.32526179,14.4706982,
+,inovine,050,,,,,45.35466415,14.3695095,
+,inovine,058,,,,,45.3281928,14.4365115,
+,inovine,059,,,,,45.3888797,14.4661716,
+,inovine,065,,,,,45.3655288,14.3964033,
+,inovine,072,,,,,45.1555101,14.7186792,
+,inovine,073,,,,,45.1282224,14.7888279,
+,inovine,077,,,,,45.1725386,14.6922114,
+,inovine,084,,,,,45.3951215,14.8001463,
+,inovine,085,,,,,45.1477004,14.6632906,
+,inovine,086,,,,,44.5467915,15.3716723,
+,inovine,090,,,,,45.3414159,14.465865,
+,inovine,097,,,,,45.0804254,14.0845863,
+,inovine,099,,,,,45.3099789,14.4887327,
+,inovine,100,,,,,45.33053039,14.4330869,
+,inovine,101,,,,,45.326124,14.441616,
+,inovine,103,,,,,44.5317382,14.4686792,
+,inovine,113,,,,,45.3800814,14.3170811,
+,inovine,114,,,,,45.0798189,13.6383151,
+,inovine,115,,,,,45.2930878,14.276523,
+,inovine,116,,,,,45.3124062,14.285405,
+,inovine,117,,,,,45.3386112,14.3083524,
+,inovine,122,,,,,45.3279817,14.2999423,
+,inovine,126,,,,,45.226691,13.5984612,
+,inovine,128,,,,,45.2228349,13.5967901,
+,inovine,133,,,,,44.876995,13.8560461,
+,inovine,139,,,,,44.8775446,13.8634951,
+,inovine,141,,,,,44.8676485,13.8488684,
+,inovine,144,,,,,44.8686192,13.8518001,
+,inovine,145,,,,,44.8664532,13.8494547,
+,inovine,147,,,,,45.0822964,13.6359903,
+,inovine,148,,,,,45.0821867,13.6344051,
+,inovine,166,,,,,45.078162,13.6497967,
+,inovine,169,,,,,45.091589,14.1238049,
+,inovine,170,,,,,45.432806,13.522156,
+,inovine,178,,,,,45.1749982,13.6070785,
+,inovine,183,,,,,43.5476124,16.4029609,
+,inovine,196,,,,,45.09841,14.116342,
+,inovine,206,,,,,45.4421678,16.2849433,
+,inovine,208,,,,,45.4956057,16.3652441,
+,inovine,214,,,,,45.3415391,16.0875645,
+,inovine,308,,,,,46.3054546,16.3301103,
+,inovine,310,,,,,46.2228422,16.1246793,
+,inovine,312,,,,,46.3530671,16.8125585,
+,inovine,315,,,,,46.3908128,16.443413,
+,inovine,318,,,,,46.3891996,16.4400418,
+,inovine,320,,,,,46.3373203,16.6137417,
+,inovine,322,,,,,46.1638382,16.8289711,
+,inovine,333,,,,,46.304793,16.328109,
+,inovine,335,,,,,46.259273,16.359449,
+,inovine,353,,,,,46.3371662,16.6154941,
+,inovine,356,,,,,46.5132597,16.4392528,
+,inovine,370,,,,,46.3886526,16.4377202,
+,inovine,401,,,,,45.4944204,15.5525529,
+,inovine,402,,,,,45.491678,15.553242,
+,inovine,403,,,,,45.4905915,15.5491435,
+,inovine,407,,,,,45.421712,15.539886,
+,inovine,408,,,,,45.4624988,15.568492,
+,inovine,415,,,,,45.6662765,15.6483507,
+,inovine,457,,,,,45.488923,15.5466431,
+,inovine,459,,,,,45.4931154,15.5490026,
+,inovine,462,,,,,45.4779436,15.5389622,
+,inovine,502,,,,,46.0915504,15.8387775,
+,inovine,527,,,,,42.9604257,17.1351614,
+,inovine,528,,,,,43.5129377,16.5040482,
+,inovine,531,,,,,43.5166667,16.4733846,
+,inovine,535,,,,,43.5186403,16.2485517,
+,inovine,543,,,,,43.5108885,16.4387718,
+,inovine,546,,,,,43.519939,16.44488,
+,inovine,547,,,,,43.35856721,16.94751334,
+,inovine,551,,,,,43.7319737,15.8931817,
+,inovine,564,,,,,43.9377728,15.444018,
+,inovine,567,,,,,43.7229412,15.9087761,
+,inovine,571,,,,,43.51871938,16.48330776,
+,inovine,575,,,,,43.376839,16.923485,
+,inovine,576,,,,,43.016335,17.275997,
+,inovine,601,,,,,45.8243885,16.0111432,
+,inovine,604,,,,,45.802097,16.010754,
+,inovine,605,,,,,45.8055747,16.0196718,
+,inovine,606,,,,,45.823136,16.007851,
+,inovine,607,,,,,45.81508,15.997361,
+,inovine,608,,,,,45.8173475,16.0072178,
+,inovine,609,,,,,45.8187827,16.0120279,
+,inovine,611,,,,,45.8246297,16.0393408,
+,inovine,613,,,,,45.80985099999999,16.1028055,
+,inovine,621,,,,,45.5779294,16.94143054,
+,inovine,622,,,,,45.341365,16.9763931,
+,inovine,623,,,,,45.479705,16.775012,
+,inovine,625,,,,,45.813905,15.991105,
+,inovine,630,,,,,45.799529,15.954448,
+,inovine,631,,,,,45.80205,15.93493,
+,inovine,634,,,,,45.79653,15.978025,
+,inovine,641,,,,,45.80598,15.96656,
+,inovine,642,,,,,45.814605,15.876737,
+,inovine,646,,,,,45.808017,15.9839544,
+,inovine,651,,,,,45.796789,15.9601988,
+,inovine,652,,,,,45.78552,15.952633,
+,inovine,653,,,,,45.82295,15.986621,
+,inovine,654,,,,,45.81407,15.964479,
+,inovine,659,,,,,45.8322763,15.9907459,
+,inovine,662,,,,,45.77233,15.965382,
+,inovine,667,,,,,45.801221,15.9771372,
+,inovine,669,,,,,45.8051985,15.9790574,
+,inovine,675,,,,,45.80532,15.97906,
+,inovine,678,,,,,45.718264,16.0545958,
+,inovine,680,,,,,45.713989,16.075695,
+,inovine,683,,,,,45.798325,15.9617341,
+,inovine,685,,,,,45.776143,15.996281,
+,inovine,690,,,,,45.8314956,16.0606947,
+,inovine,695,,,,,45.809744,16.016442,
+,inovine,696,,,,,45.79844,15.88914,
+,inovine,697,,,,,45.77714,15.97228,
+,inovine,699,,,,,45.776143,15.996281,
+,inovine,702,,,,,45.8143116,15.9772183,
+,inovine,704,,,,,45.8143262,15.9913334,
+,inovine,706,,,,,45.82684,16.110648,
+,inovine,708,,,,,45.786161,15.950635,
+,inovine,712,,,,,45.805158,15.978475,
+,inovine,716,,,,,45.803249,16.020315,
+,inovine,720,,,,,45.79989,15.980462,
+,inovine,725,,,,,45.816909,15.872713,
+,inovine,727,,,,,45.815046,15.877984,
+,inovine,729,,,,,45.8314956,16.0606947,
+,inovine,730,,,,,45.783294,15.961483,
+,inovine,734,,,,,45.79180409,16.00093459,
+,inovine,735,,,,,45.7960476,15.8992968,
+,inovine,741,,,,,45.798467,15.9709472,
+,inovine,744,,,,,45.835027,16.1073057,
+,inovine,753,,,,,45.799377,15.884766,
+,inovine,754,,,,,45.8002638,15.9742856,
+,inovine,757,,,,,45.916676,15.777044,
+,inovine,758,,,,,45.777035,15.978908,
+,inovine,761,,,,,45.8038219,15.9933081,
+,inovine,764,,,,,45.82337,16.00836,
+,inovine,765,,,,,45.810578,16.01235,
+,inovine,767,,,,,45.7649426,16.004788,
+,inovine,806,,,,,45.8138035,15.9644868,
+,inovine,827,,,,,45.8176575,16.0365006,
+,inovine,842,,,,,45.778644,15.995745,
+,inovine,844,,,,,45.8122589,15.9789567,
+,inovine,846,,,,,45.8100208,15.9800964,
+,inovine,847,,,,,45.804883,15.976422,
+,inovine,877,,,,,45.8046382,15.9211669,
+,inovine,878,,,,,45.8132579,15.9425909,
+,inovine,911,,,,,45.8356611,17.3867645,
+,inovine,969,,,,,44.8611156,13.8322533,
+,inovine,972,,,,,44.124325,15.2367055,
+,inovine,973,,,,,44.103462,15.264628,
+,inovine,974,,,,,45.239759,13.9373092,
+,inovine,975,,,,,45.323668,14.524628,
+,inovine,978,,,,,45.3182637,14.4727485,
+,inovine,979,,,,,45.082193,13.634408,
+,inovine,1010,,,,,42.641342,18.109046,
+,inovine,1017,,,,,45.32503229,14.44354587,
+,inovine,1019,,,,,45.14683762,13.60562963,
+,inovine,1021,,,,,45.3409206,14.3982313,
+,inovine,1025,,,,,45.08876,13.64658,
+,inovine,1028,,,,,45.55476769,18.69799234,
+,inovine,1031,,,,,44.86940457,13.8433731,
+,inovine,1038,,,,,42.6632843,18.0832813,
+,inovine,1041,,,,,45.2370328,13.5984766,

@@ -20,7 +20,7 @@ Objašnjenje:
 Arhiva sadrži podatke za sljedeće trgovačke lance: Konzum, Spar, Studenac, Plodine, Lidl, Tommy,
 Kaufland, Eurospin, dm, KTC, Metro, Trgocentar, Žabac, Vrutak, Ribola, NTL, Roto, Boso,
 Brodokomerc, Lorenco, Trgovina Krk, Jadranka Trgovina, Gavranović, Branka, Djelo Vodice, Bure,
-Dukat, Diskont Stanić, Stridon.
+Dukat, Diskont Stanić, Stridon, Pivac, Bipa, ZooCity, Pet Centar, iNovine.
 
 ## Formati CSV datoteka
 

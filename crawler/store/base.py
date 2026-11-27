@@ -17,6 +17,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from .models import Product, Store
+from .utils import load_store_map
 
 logger = getLogger(__name__)
 
@@ -771,7 +772,8 @@ class BaseCrawler:
         Parse an anchor price date published by the chain, best-effort.
 
         Args:
-            value: Date such as "2.5.2025", "02.05.2025." or "02052025"
+            value: Date such as "2.5.2025", "02.05.2025.", "02052025" or
+                "2025-05-02"
 
         Returns:
             ISO date, or "" if the value isn't a recognized date
@@ -783,7 +785,7 @@ class BaseCrawler:
         if not value:
             return ""
 
-        for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d%m%Y"):
+        for fmt in ("%d.%m.%Y", "%d.%m.%y", "%d%m%Y", "%Y-%m-%d"):
             try:
                 return datetime.datetime.strptime(value, fmt).date().isoformat()
             except ValueError:
@@ -850,6 +852,22 @@ class BaseCrawler:
             data["special_sale_type"] = str(data["special_sale_type"]).strip() or None
 
         return data
+
+    def keep_row(self, row: dict[str, str]) -> bool:
+        """
+        Decide, before parsing, whether a CSV row is a product to keep.
+
+        For rows a chain publishes that are not products for sale, such as
+        testers and coupons without a price. Skipping them here keeps them out
+        of the per-row error log in parse_csv.
+
+        Args:
+            row: The row as read, keyed by the column names in the file
+
+        Returns:
+            True to parse the row, False to skip it
+        """
+        return True
 
     def parse_csv_row(self, row: dict) -> Product:
         """
@@ -1029,6 +1047,8 @@ class BaseCrawler:
 
         products = []
         for row in reader:
+            if not self.keep_row(row):
+                continue
             try:
                 product = self.parse_csv_row(row)
             except Exception:
@@ -1072,6 +1092,38 @@ class BaseCrawler:
             zip_urls_by_date[url_date] = url
 
         return zip_urls_by_date
+
+    def get_mapped_store(self, store_id: str, name: str) -> Store:
+        """
+        Build a store from its row in enrichment/stores.csv.
+
+        For chains whose files carry no usable store address. An unknown store
+        is kept with empty details, so its prices are not lost.
+
+        Args:
+            store_id: Store code, as in the code column of enrichment/stores.csv
+            name: Store name
+
+        Returns:
+            Store with the type and address from the map, without products
+        """
+        info = load_store_map(self.CHAIN).get(store_id)
+        if info is None:
+            logger.warning(
+                f"Unknown {self.CHAIN} store {store_id}, "
+                "add it to enrichment/stores.csv"
+            )
+            info = {}
+
+        return Store(
+            chain=self.CHAIN,
+            store_id=store_id,
+            name=name,
+            store_type=info.get("type", ""),
+            city=info.get("city", ""),
+            street_address=info.get("address", ""),
+            zipcode=info.get("zipcode", ""),
+        )
 
     def get_all_products(self, date: datetime.date) -> list[Store]:
         raise NotImplementedError()
