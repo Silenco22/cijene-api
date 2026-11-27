@@ -150,7 +150,8 @@ def count_rows(chain_dir: Path) -> Counts | None:
     """
     Row counts of a chain's CSV files, or None if any of them is missing.
 
-    `save_csv` normalizes whitespace, so each row is one line.
+    The chain writer in `crawler/store/output.py` normalizes whitespace, so
+    each row is one line.
     """
     paths = [chain_dir / f"{name}.csv" for name in Counts._fields]
     if not all(path.is_file() for path in paths):

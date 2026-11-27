@@ -1,6 +1,7 @@
 import datetime
 import re
 import unicodedata
+from contextlib import contextmanager
 from csv import DictReader
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from email.utils import parsedate_to_datetime
@@ -37,9 +38,10 @@ class CrawlerBlocked(Exception):
     RETRY_AFTER_MAX. Neither is retried: further requests would only extend the
     block.
 
-    A crawler should end the chain on this rather than swallow it per store, and
-    return whatever it had already collected. `blocked` then tells crawl_chain
-    the chain is incomplete.
+    A crawler should end the chain on this rather than swallow it per store:
+    either let it out, or stop and return (or stop yielding) the stores it has.
+    crawl_chain keeps the stores delivered before the block either way, and
+    `blocked` tells it the chain is incomplete.
     """
 
 
@@ -590,29 +592,39 @@ class BaseCrawler:
     def read_csv(self, text: str, delimiter: str = ",") -> DictReader:
         return DictReader(text.splitlines(), delimiter=delimiter)
 
-    def get_zip_contents(
-        self, url: str, suffix: str
-    ) -> Generator[tuple[str, bytes], None, None]:
+    @contextmanager
+    def open_zip(self, url: str) -> Generator[ZipFile, None, None]:
+        """
+        Download a ZIP to a temporary file and open it.
+
+        The temporary file is removed when the context exits.
+        """
         with NamedTemporaryFile(mode="w+b") as temp_zip:
             self.fetch_binary(url, temp_zip)
             temp_zip.seek(0)
 
             with ZipFile(temp_zip, "r") as zip_fp:
-                for file_info in zip_fp.infolist():
-                    if not file_info.filename.endswith(suffix):
-                        continue
+                yield zip_fp
 
-                    logger.debug(f"Processing file: {file_info.filename}")
+    def get_zip_contents(
+        self, url: str, suffix: str
+    ) -> Generator[tuple[str, bytes], None, None]:
+        with self.open_zip(url) as zip_fp:
+            for file_info in zip_fp.infolist():
+                if not file_info.filename.endswith(suffix):
+                    continue
 
-                    try:
-                        with zip_fp.open(file_info) as file:
-                            xml_content = file.read()
-                            yield (file_info.filename, xml_content)
-                    except Exception as e:
-                        logger.error(
-                            f"Error processing file {file_info.filename}: {e}",
-                            exc_info=True,
-                        )
+                logger.debug(f"Processing file: {file_info.filename}")
+
+                try:
+                    with zip_fp.open(file_info) as file:
+                        xml_content = file.read()
+                        yield (file_info.filename, xml_content)
+                except Exception as e:
+                    logger.error(
+                        f"Error processing file {file_info.filename}: {e}",
+                        exc_info=True,
+                    )
 
     @staticmethod
     def parse_price(
@@ -1008,8 +1020,33 @@ class BaseCrawler:
             zipcode=info.get("zipcode", ""),
         )
 
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
+        """
+        Yield the chain's stores for the date, each one when it is complete.
+
+        crawl_chain writes each store as it comes and drops it, so a crawler
+        that overrides this keeps only about one store in memory. After a
+        store is yielded, nothing in the crawler may refer to it or its items.
+
+        An override must be a generator function (`yield`): crawl_chain calls
+        `close()` on the result. An exception ends the chain, and the stores
+        yielded before it are kept.
+        """
+        if type(self).get_all_products is BaseCrawler.get_all_products:
+            raise NotImplementedError(
+                f"{type(self).__name__} must override iter_stores or get_all_products"
+            )
+        # Crawlers not converted yet: all stores in memory, then one at a time
+        yield from self.get_all_products(date)
+
     def get_all_products(self, date: datetime.date) -> list[Store]:
-        raise NotImplementedError()
+        """
+        All stores for the date as a list, for tests and __main__ blocks.
+
+        A crawler overrides this instead of iter_stores only if it keeps all
+        its stores in memory anyway.
+        """
+        return list(self.iter_stores(date))
 
     def crawl(self, date: datetime.date) -> list[Store]:
         name = self.CHAIN.capitalize()

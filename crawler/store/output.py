@@ -1,15 +1,16 @@
+import csv
 import re
+import shutil
+from contextlib import suppress
 from csv import DictWriter
-from decimal import Decimal
 from logging import getLogger
-from os import makedirs
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from common.barcodes import normalize_barcode
 
 from .cities import normalize_city
-from .models import Store
+from .models import Product, Store
 
 logger = getLogger(__name__)
 
@@ -45,68 +46,45 @@ PRICE_COLUMNS = [
 ]
 
 
-def transform_products(
-    stores: list[Store],
-) -> tuple[list[dict], list[dict], list[dict]]:
-    """
-    Transform store data into a structured format for CSV export.
+def store_row(store: Store) -> dict:
+    """The row of a store in stores.csv, before cleaning."""
+    return {
+        "store_id": store.store_id,
+        "type": store.store_type,
+        "address": store.street_address,
+        "city": normalize_city(store.city),
+        "zipcode": store.zipcode,
+    }
 
-    Args:
-        stores: List of Store objects containing product data.
 
-    Returns:
-        Tuple containing:
-            - List of store dictionaries with STORE_COLUMNS
-            - List of product dictionaries with PRODUCT_COLUMNS
-            - List of price dictionaries with PRICE_COLUMNS
-    """
-    store_list = []
-    product_map = {}
-    price_list = []
+def product_row(chain: str, product: Product) -> dict:
+    """The row of a product in products.csv, before cleaning."""
+    return {
+        "barcode": normalize_barcode(product.barcode)
+        or f"{chain}:{product.product_id}",
+        "product_id": product.product_id,
+        "name": product.product,
+        "brand": product.brand,
+        "category": product.category,
+        "unit": product.unit,
+        "quantity": product.quantity,
+    }
 
-    def maybe(val: Decimal | None) -> Decimal | str:
-        return val if val is not None else ""
 
-    for store in stores:
-        store_data = {
-            "store_id": store.store_id,
-            "type": store.store_type,
-            "address": store.street_address,
-            "city": normalize_city(store.city),
-            "zipcode": store.zipcode or "",
-        }
-        store_list.append(store_data)
-
-        for product in store.items:
-            key = f"{store.chain}:{product.product_id}"
-            if key not in product_map:
-                product_map[key] = {
-                    "barcode": normalize_barcode(product.barcode) or key,
-                    "product_id": product.product_id,
-                    "name": product.product,
-                    "brand": product.brand,
-                    "category": product.category,
-                    "unit": product.unit,
-                    "quantity": product.quantity,
-                }
-            price_list.append(
-                {
-                    "store_id": store.store_id,
-                    "product_id": product.product_id,
-                    "price": product.price,
-                    "unit_price": maybe(product.unit_price),
-                    "best_price_30": maybe(product.best_price_30),
-                    "anchor_price": maybe(product.anchor_price),
-                    "special_price": maybe(product.special_price),
-                    "available": ""
-                    if product.available is None
-                    else int(product.available),
-                    "special_sale_type": product.special_sale_type or "",
-                    "anchor_price_date": product.anchor_price_date or "",
-                }
-            )
-
-    return store_list, list(product_map.values()), price_list
+def price_row(store: Store, product: Product) -> dict:
+    """The row of a product's price in a store in prices.csv, before cleaning."""
+    return {
+        "store_id": store.store_id,
+        "product_id": product.product_id,
+        "price": product.price,
+        "unit_price": product.unit_price,
+        "best_price_30": product.best_price_30,
+        "anchor_price": product.anchor_price,
+        "special_price": product.special_price,
+        "available": None if product.available is None else int(product.available),
+        "special_sale_type": product.special_sale_type,
+        "anchor_price_date": product.anchor_price_date,
+    }
 
 
 def normalize_whitespace(value: str) -> str:
@@ -121,6 +99,14 @@ def normalize_whitespace(value: str) -> str:
         String with normalized whitespace
     """
     return re.sub(r"\s+", " ", value)
+
+
+def clean_row(row: dict) -> dict[str, str]:
+    """A row as written to the CSV: strings, whitespace normalized."""
+    return {
+        k: normalize_whitespace(str(v).strip()) if v is not None else ""
+        for k, v in row.items()
+    }
 
 
 def save_csv(path: Path, data: list[dict], columns: list[str]):
@@ -146,41 +132,132 @@ def save_csv(path: Path, data: list[dict], columns: list[str]):
         writer = DictWriter(f, fieldnames=columns)
         writer.writeheader()
         for row in data:
-            writer.writerow(
-                {
-                    k: normalize_whitespace(str(v).strip()) if v is not None else ""
-                    for k, v in row.items()
-                }
-            )
+            writer.writerow(clean_row(row))
 
 
-def save_chain(chain_path: Path, stores: list[Store]):
+class ChainWriter:
     """
-    Save retail chain data to CSV files.
+    Save one retail chain's data, taking its stores one at a time.
 
-    This function creates a directory for the retail chain and saves:
+    Writes to the chain directory:
 
     * stores.csv - containing store information with STORE_COLUMNS
     * products.csv - containing product information with PRODUCT_COLUMNS
     * prices.csv - containing price information with PRICE_COLUMNS
 
-    Args:
-        chain_path: Path to the directory where CSV files will be saved
-            (will be created if it doesn't exist).
-        stores: List of Store objects containing product data.
+    `add` writes each store's price rows to a part file in `<path>/.parts`, so
+    the caller can drop the store's products. `finish` writes the CSV files
+    and removes the part files. Only the store rows and one row per distinct
+    product stay in memory, and in `finish` the price rows of one store.
+
+    The CSV files are sorted by store ID, then product ID. Rows with equal
+    keys keep the order in which they were added: two stores with the same
+    store ID, or a product listed twice in a store. For each product ID,
+    products.csv has the product as the first store added lists it.
     """
 
-    makedirs(chain_path, exist_ok=True)
-    store_list, product_list, price_list = transform_products(stores)
+    PARTS_DIR = ".parts"
 
-    # Sort data before writing to CSV
-    store_list.sort(key=lambda x: str(x["store_id"]))
-    product_list.sort(key=lambda x: str(x["product_id"]))
-    price_list.sort(key=lambda x: (str(x["store_id"]), str(x["product_id"])))
+    def __init__(self, path: Path):
+        """
+        Args:
+            path: Directory for the CSV files. Created by the first `add`.
+        """
+        self.path = path
+        self.parts_path = path / self.PARTS_DIR
+        self.n_stores = 0
+        self.n_prices = 0
 
-    save_csv(chain_path / "stores.csv", store_list, STORE_COLUMNS)
-    save_csv(chain_path / "products.csv", product_list, PRODUCT_COLUMNS)
-    save_csv(chain_path / "prices.csv", price_list, PRICE_COLUMNS)
+        self._created_path = False
+        self._stores: list[dict] = []
+        # product_id -> products.csv row of the first product seen
+        self._products: dict[str, dict] = {}
+        # store_id -> part files of the stores with that ID, in the order added
+        self._parts: dict[str, list[Path]] = {}
+
+        # Part files of a run that was killed
+        shutil.rmtree(self.parts_path, ignore_errors=True)
+
+    @property
+    def n_products(self) -> int:
+        """Number of distinct products in the stores added."""
+        return len(self._products)
+
+    def add(self, store: Store) -> None:
+        """
+        Add a complete store with its products.
+
+        If this raises, call `abort`: the writer is not usable after it.
+        """
+        if not self.n_stores:
+            self._created_path = not self.path.exists()
+            self.parts_path.mkdir(parents=True, exist_ok=True)
+
+        self._stores.append(store_row(store))
+
+        # Numbered, not named by store ID: store IDs repeat, and IDs that differ
+        # only in case are the same file name on macOS and Windows.
+        part = self.parts_path / f"{self.n_stores + 1:06d}.csv"
+        with open(part, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            for product in store.items:
+                if product.product_id not in self._products:
+                    self._products[product.product_id] = product_row(
+                        store.chain, product
+                    )
+
+                # The raw product ID first, as the sort key in `finish`
+                row = clean_row(price_row(store, product))
+                writer.writerow(
+                    [product.product_id] + [row[col] for col in PRICE_COLUMNS]
+                )
+
+        self._parts.setdefault(store.store_id, []).append(part)
+        self.n_stores += 1
+        self.n_prices += len(store.items)
+
+    def finish(self) -> None:
+        """
+        Write the CSV files and remove the part files.
+
+        A file without rows is not written, as with `save_csv`.
+        """
+        try:
+            self._stores.sort(key=lambda row: row["store_id"])
+            save_csv(self.path / "stores.csv", self._stores, STORE_COLUMNS)
+
+            products = sorted(
+                self._products.values(), key=lambda row: row["product_id"]
+            )
+            save_csv(self.path / "products.csv", products, PRODUCT_COLUMNS)
+
+            self._write_prices(self.path / "prices.csv")
+        finally:
+            shutil.rmtree(self.parts_path, ignore_errors=True)
+
+    def _write_prices(self, path: Path) -> None:
+        if not self.n_prices:
+            logger.warning(f"No data to save at {path}, skipping")
+            return
+
+        with open(path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(PRICE_COLUMNS)
+            for store_id in sorted(self._parts):
+                rows: list[list[str]] = []
+                for part in self._parts[store_id]:
+                    with open(part, newline="", encoding="utf-8") as pf:
+                        rows.extend(csv.reader(pf))
+                rows.sort(key=lambda row: row[0])  # stable
+                writer.writerows(row[1:] for row in rows)
+
+    def abort(self) -> None:
+        """Remove the part files, and the chain directory if `add` created it."""
+        shutil.rmtree(self.parts_path, ignore_errors=True)
+        if self._created_path:
+            # Empty unless something else wrote to it; then keep it
+            with suppress(OSError):
+                self.path.rmdir()
 
 
 def copy_archive_info(path: Path):

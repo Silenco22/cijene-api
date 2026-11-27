@@ -26,7 +26,7 @@ from crawler.store.lidl import LidlCrawler
 from crawler.store.lorenco import LorencoCrawler
 from crawler.store.metro import MetroCrawler
 from crawler.store.ntl import NtlCrawler
-from crawler.store.output import copy_archive_info, create_archive, save_chain
+from crawler.store.output import ChainWriter, copy_archive_info, create_archive
 from crawler.store.petcentar import PetCentarCrawler
 from crawler.store.pivac import PivacCrawler
 from crawler.store.plodine import PlodineCrawler
@@ -116,45 +116,51 @@ def crawl_chain(chain: str, date: datetime.date, path: Path) -> CrawlResult:
         raise ValueError(f"Unknown retail chain: {chain}")
 
     crawler = crawler_class()
+    writer = ChainWriter(path)
     t0 = time()
+
+    stores = crawler.iter_stores(date)
     try:
-        stores = crawler.get_all_products(date)
-    except CrawlerBlocked as err:
-        logger.error(
-            f"Blocked while crawling {chain} for {date:%Y-%m-%d}, "
-            f"discarding the run: {err}"
-        )
-        return CrawlResult()
-    except Exception as err:
-        logger.error(
-            f"Error crawling {chain} for {date:%Y-%m-%d}: {err}", exc_info=True
-        )
-        return CrawlResult()
+        while True:
+            try:
+                store = next(stores)
+            except StopIteration:
+                break
+            except Exception as err:
+                logger.error(
+                    f"Error crawling {chain} for {date:%Y-%m-%d}, keeping the "
+                    f"{writer.n_stores} store(s) before it: {err}",
+                    exc_info=not isinstance(err, CrawlerBlocked),
+                )
+                break
+            writer.add(store)
+    except BaseException:
+        # A writer error (or an interrupt) fails the chain and writes nothing
+        writer.abort()
+        raise
+    finally:
+        # Ends the crawler early if the loop stopped, removing its temp files
+        stores.close()
 
     if crawler.blocked:
         logger.error(
             f"{chain} was blocked part-way through {date:%Y-%m-%d}: "
-            f"keeping the {len(stores)} store(s) collected before the block, "
+            f"keeping the {writer.n_stores} store(s) collected before the block, "
             f"this chain is incomplete"
         )
 
-    if not stores:
+    if not writer.n_stores:
         logger.error(f"No stores imported for {chain} on {date}")
         return CrawlResult()
 
-    save_chain(path, stores)
+    writer.finish()
     t1 = time()
-
-    all_products = set()
-    for store in stores:
-        for product in store.items:
-            all_products.add(product.product_id)
 
     return CrawlResult(
         elapsed_time=t1 - t0,
-        n_stores=len(stores),
-        n_products=len(all_products),
-        n_prices=sum(len(store.items) for store in stores),
+        n_stores=writer.n_stores,
+        n_products=writer.n_products,
+        n_prices=writer.n_prices,
     )
 
 
