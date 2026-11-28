@@ -3,7 +3,7 @@ import logging
 import re
 import time
 import urllib.parse
-from typing import Any, Iterator, List
+from typing import Any, Generator, List
 
 import httpx
 from bs4 import BeautifulSoup
@@ -116,6 +116,9 @@ class KonzumCrawler(BaseCrawler):
 
     ADDRESS_PATTERN = re.compile(r"(.*) (\d{5}) (.*)")
 
+    FILE_DATE_PREFIX = re.compile(r"^\d{8}-")
+    """Price list file names start with the date, e.g. "20261127-SUPER,..."."""
+
     def fix_product_data(self, data: dict[str, Any]) -> dict[str, Any]:
         new_anchor_price = data.pop("new_anchor_price", None)
         on_special = data.pop("on_special", None)
@@ -150,45 +153,37 @@ class KonzumCrawler(BaseCrawler):
 
         soup = BeautifulSoup(content, "html.parser")
 
-        # Fork change (2026-11-27): until 2026-11-26 the links were relative,
-        # marked format="csv", with the store in a ?title= parameter. Since
-        # 2026-11-27 they are absolute CloudFront links without that attribute,
-        # and the file name is the title (see parse_store_info).
+        # Since 2026-11-27 the links point to the files on CloudFront. Each
+        # price list has two links (the title and the download button).
         urls = []
         for link in soup.select("a[href]"):
-            href = str(link.get("href"))
-            path = urllib.parse.urlparse(href).path
-            if link.get("format") == "csv" or path.lower().endswith(".csv"):
-                urls.append(urllib.parse.urljoin(self.BASE_URL, href))
+            url = urllib.parse.urljoin(self.BASE_URL, str(link.get("href")))
+            if urllib.parse.urlparse(url).path.lower().endswith(".csv"):
+                urls.append(url)
 
         return list(set(urls))
 
     def parse_store_info(self, url: str) -> Store:
         """
-        Extracts store information from a CSV download URL.
+        Extracts store information from a price list URL.
 
         Args:
-            url: CSV download URL with store information in the query parameters
+            url: Price list URL; its file name is the date and the store info
 
         Returns:
-            Store object with parsed store information, or None if parsing fails
+            Store object with parsed store information
+
+        Raises:
+            ValueError: The file name has no store info that can be parsed.
         """
 
         logger.debug(f"Parsing store information from URL: {url}")
 
-        parsed_url = urllib.parse.urlparse(url)
-        query_params = urllib.parse.parse_qs(parsed_url.query)
-        title = urllib.parse.unquote(query_params.get("title", [""])[0])
-        if not title:
-            # Fork change (2026-11-27): the file name is the title, prefixed
-            # with the date: 20261127-SUPER,ŽITNA 1A 10310 IVANIĆ GRAD,0204,
-            # 113814,27.11.2026, 05-23.CSV
-            filename = urllib.parse.unquote(parsed_url.path.rsplit("/", 1)[-1])
-            title = re.sub(r"^\d{8}-", "", filename)
-        title = title.replace("_", " ")
+        file_name = urllib.parse.unquote(urllib.parse.urlparse(url).path)
+        title = self.FILE_DATE_PREFIX.sub("", file_name.rsplit("/", 1)[-1])
 
         if not title:
-            raise ValueError(f"No title parameter found in URL: {url}")
+            raise ValueError(f"No file name found in URL: {url}")
 
         logger.debug(f"Decoded title: {title}")
 
@@ -296,10 +291,7 @@ class KonzumCrawler(BaseCrawler):
         content = self.fetch_text(csv_url, attempts=self.CSV_ATTEMPTS)
         return self.parse_csv(content)
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
-        return list(self.iter_all_products(date))
-
-    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         """
         Main method to fetch and parse all store, product and price info.
 
@@ -311,14 +303,15 @@ class KonzumCrawler(BaseCrawler):
         Args:
             date: The date to search for in the price list.
 
-        Returns:
-            List of Store objects with their products.
+        Yields:
+            Store objects with their products, each as its price list comes in.
 
         Raises:
             ValueError: If no price list is found for the given date.
 
-        Fork change (2026-10-08): a generator yielding each store as its price
-        list comes in (1.8M rows per day since NN 101/2026).
+        Fork change (2026-10-08): a generator (1.8M rows per day since
+        NN 101/2026). `pending` keeps each Store until the round ends, so a
+        copy carries the products and is the only reference to them.
         """
 
         csv_links = self.get_index(date)
@@ -383,9 +376,8 @@ class KonzumCrawler(BaseCrawler):
                     dropped += 1
                     continue
 
-                store.items = products
                 collected += 1
-                yield store
+                yield store.model_copy(update={"items": products})
 
             pending = missing
             if stop or sweeps >= self.SWEEP_ROUNDS:

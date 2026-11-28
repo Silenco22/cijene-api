@@ -28,6 +28,10 @@ CASES = [
     ("Grubisno", "Grubišno Polje"),
     ("Kostajnica", "Hrvatska Kostajnica"),
     ("Hrv.kostajnica", "Hrvatska Kostajnica"),
+    ("Sv.Ivan Zabno", "Sveti Ivan Žabno"),
+    ("Zl. Bistrica", "Zlatar Bistrica"),
+    ("G. Lomnica", "Gornja Lomnica"),
+    ("Durmanec", "Đurmanec"),
     ("V.gorica", "Velika Gorica"),
     ("Sesvete - Kraljevec", "Sesvetski Kraljevec"),  # post office name
     ("Draganici", "Draganić"),
@@ -37,6 +41,7 @@ CASES = [
     ("Vodnjan", "Vodnjan"),
     ("Fazana", "Fažana"),
     ("Novigrad(Cittanova)", "Novigrad"),
+    ("Kastelir (Castelliere)", "Kaštelir"),
     # Zagreb districts collapse to Zagreb, except Sesvete kept separate
     ("Zagreb Prečko", "Zagreb"),
     ("Zagreb-Dubrava", "Zagreb"),

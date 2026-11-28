@@ -2,7 +2,7 @@ import datetime
 import logging
 import re
 from json import loads
-from typing import Iterator, Optional
+from typing import Generator, Optional
 
 from crawler.store.models import Store
 
@@ -202,10 +202,7 @@ class SparCrawler(BaseCrawler):
         )
         return store
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
-        return list(self.iter_all_products(date))
-
-    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         """
         Main method to fetch and parse all products from Spar's price lists.
 

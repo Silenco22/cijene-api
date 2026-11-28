@@ -3,11 +3,10 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from shutil import rmtree
 from time import time
 from typing import List
 
-from crawler.store.base import CrawlerBlocked, CrawlerFormatChanged
+from crawler.store.base import CrawlerBlocked
 from crawler.store.bipa import BipaCrawler
 from crawler.store.boso import BosoCrawler
 from crawler.store.branka import BrankaCrawler
@@ -27,7 +26,7 @@ from crawler.store.lidl import LidlCrawler
 from crawler.store.lorenco import LorencoCrawler
 from crawler.store.metro import MetroCrawler
 from crawler.store.ntl import NtlCrawler
-from crawler.store.output import copy_archive_info, create_archive, save_chain
+from crawler.store.output import ChainWriter, copy_archive_info, create_archive
 from crawler.store.petcentar import PetCentarCrawler
 from crawler.store.pivac import PivacCrawler
 from crawler.store.plodine import PlodineCrawler
@@ -117,34 +116,31 @@ def crawl_chain(chain: str, date: datetime.date, path: Path) -> CrawlResult:
         raise ValueError(f"Unknown retail chain: {chain}")
 
     crawler = crawler_class()
+    writer = ChainWriter(path)
     t0 = time()
-    # Fork change (2026-10-08): iter_all_products is a generator for the
-    # chains with huge lists (plodine, lidl, ntl) and save_chain writes it
-    # store by store, so crawl errors now surface while saving. Whatever was
-    # already written is removed on failure, exactly as a failed crawl used to
-    # write nothing.
+
+    stores = crawler.iter_stores(date)
     try:
-        stats = save_chain(path, crawler.iter_all_products(date))
-    except CrawlerFormatChanged as err:
-        logger.error(
-            f"{chain} price lists for {date:%Y-%m-%d} are in a format the crawler "
-            f"does not read, discarding the run: {err}"
-        )
-        rmtree(path, ignore_errors=True)
-        return CrawlResult()
-    except CrawlerBlocked as err:
-        logger.error(
-            f"Blocked while crawling {chain} for {date:%Y-%m-%d}, "
-            f"discarding the run: {err}"
-        )
-        rmtree(path, ignore_errors=True)
-        return CrawlResult()
-    except Exception as err:
-        logger.error(
-            f"Error crawling {chain} for {date:%Y-%m-%d}: {err}", exc_info=True
-        )
-        rmtree(path, ignore_errors=True)
-        return CrawlResult()
+        while True:
+            try:
+                store = next(stores)
+            except StopIteration:
+                break
+            except Exception as err:
+                logger.error(
+                    f"Error crawling {chain} for {date:%Y-%m-%d}, keeping the "
+                    f"{writer.n_stores} store(s) before it: {err}",
+                    exc_info=not isinstance(err, CrawlerBlocked),
+                )
+                break
+            writer.add(store)
+    except BaseException:
+        # A writer error (or an interrupt) fails the chain and writes nothing
+        writer.abort()
+        raise
+    finally:
+        # Ends the crawler early if the loop stopped, removing its temp files
+        stores.close()
 
     if crawler.format_changed:
         # A crawler that skips a failed store also skipped the
@@ -158,22 +154,22 @@ def crawl_chain(chain: str, date: datetime.date, path: Path) -> CrawlResult:
     if crawler.blocked:
         logger.error(
             f"{chain} was blocked part-way through {date:%Y-%m-%d}: "
-            f"keeping the {stats.n_stores} store(s) collected before the block, "
+            f"keeping the {writer.n_stores} store(s) collected before the block, "
             f"this chain is incomplete"
         )
 
-    if not stats.n_stores:
+    if not writer.n_stores:
         logger.error(f"No stores imported for {chain} on {date}")
-        rmtree(path, ignore_errors=True)
         return CrawlResult()
 
+    writer.finish()
     t1 = time()
 
     return CrawlResult(
         elapsed_time=t1 - t0,
-        n_stores=stats.n_stores,
-        n_products=stats.n_products,
-        n_prices=stats.n_prices,
+        n_stores=writer.n_stores,
+        n_products=writer.n_products,
+        n_prices=writer.n_prices,
     )
 
 

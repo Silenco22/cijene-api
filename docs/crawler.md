@@ -33,7 +33,7 @@ The output code also uses `common/barcodes.py` (barcode normalization) and `enri
 2. **Index Fetching**: The crawler downloads the index page or API response and selects the files for the requested date.
 3. **Data Retrieval**: The crawler downloads the price lists (CSV, XML, XLSX or JSON). All requests go through the pacing and retry logic in `BaseCrawler`.
 4. **Data Parsing**: The crawler checks the columns of each file and parses the rows into `Product` objects, grouped by `Store`.
-5. **Output Generation**: `save_chain()` writes the CSV files of the chain. `crawl()` then adds `archive-info.txt` and creates the ZIP archive.
+5. **Output Generation**: `crawl_chain()` gives each store to a `ChainWriter` (`output.py`) as the crawler yields it, and the writer writes the CSV files of the chain. `crawl()` then adds `archive-info.txt` and creates the ZIP archive.
 
 ## Base Crawler Class
 
@@ -128,10 +128,12 @@ class MyCrawler(BaseCrawler):
 - `parse_anchor_date(value)`: Parse an anchor price date such as `2.5.2025`, `02.05.2025.` or `02052025` to an ISO date, or return `""`.
 - `strip_diacritics(text)`: Remove diacritics from a string.
 - `get_zip_contents(url, suffix)`: Download a ZIP and yield `(filename, bytes)` for each file whose name ends with `suffix`.
+- `open_zip(url)`: Context manager. Download a ZIP to a temporary file and give the open `ZipFile`, for crawlers that select the files by name first (Plodine).
 - `parse_index_for_zip(html_content)`: Return `{date: zip_url}` for the ZIP links that match `ZIP_DATE_PATTERN`.
 - `is_retryable(err)`: Return whether another attempt at a failed request can succeed.
-- `get_all_products(date)`: Main entry point; returns `list[Store]`. Each crawler must implement it (the base method raises `NotImplementedError`).
-- `crawl(date)`: Call `get_all_products()`, log the store and price counts and the elapsed time, and log and re-raise errors. The `__main__` blocks use it; `crawl_chain()` calls `get_all_products()` directly.
+- `iter_stores(date)`: Main entry point; a generator that yields each `Store` when it is complete. `crawl_chain()` writes each store and drops it, so only about one store is in memory. After a store is yielded, the crawler must not refer to it or to its items. An override must be a generator function (`yield`), because `crawl_chain()` calls `close()` on it. The base method yields from `get_all_products()`.
+- `get_all_products(date)`: Return all stores as a `list[Store]`, for tests and the `__main__` blocks. The base method collects `iter_stores()`. Each crawler overrides one of the two methods: `iter_stores()` (Plodine, Bipa, Studenac), or `get_all_products()` for crawlers not converted yet, which keep all stores in memory.
+- `crawl(date)`: Call `get_all_products()`, log the store and price counts and the elapsed time, and log and re-raise errors. The `__main__` blocks use it; `crawl_chain()` calls `iter_stores()`.
 
 Instance attributes: `self.client` (the `httpx.Client`), `self.blocked` (see `CrawlerBlocked` below) and `self.requests_made` (number of attempts sent, retries included).
 
@@ -191,8 +193,8 @@ Crawlers that run their own retry passes call `is_retryable(err)` before they qu
 
 Do not swallow `CrawlerBlocked` per store. There are two correct ways to handle it:
 
-- Stop the loop and return the stores collected so far (see `LidlCrawler.get_all_products()`, `BosoCrawler.get_all_products()`). `crawl_chain()` sees `crawler.blocked`, logs an error that the chain is incomplete, and saves the collected stores.
-- Let it propagate out of `get_all_products()` (Spar, Tommy, Dukat and Lorenco re-raise it). `crawl_chain()` then discards the run and writes no files for the chain.
+- Stop the loop and return (or stop yielding) the stores collected so far (see `LidlCrawler.get_all_products()`, `BosoCrawler.get_all_products()`). `crawl_chain()` sees `crawler.blocked`, logs an error that the chain is incomplete, and saves the collected stores.
+- Let it propagate out of `iter_stores()` or `get_all_products()` (Bipa, Spar, Tommy, Dukat and Lorenco re-raise it). `crawl_chain()` logs the error and saves the stores yielded before it. A crawler that overrides only `get_all_products()` yields nothing before it returns, so for such a crawler nothing is saved.
 
 ## Data Models
 
@@ -309,7 +311,7 @@ def get_all_products(self, date: datetime.date) -> list[Store]:
 
 `get_zip_contents()` downloads the ZIP to a temporary file with `fetch_binary()` and yields the name and content of each matching file. If one file in the ZIP cannot be read, it logs the error and continues with the next file.
 
-A daily ZIP can contain more than one file per store. `PlodineCrawler.get_all_products()` reads the timestamp from each file name, skips files published on another date, and keeps the latest file per store. `TrgocentarCrawler.get_zip_stores()` also keeps the latest file per store.
+A daily ZIP can contain more than one file per store. `PlodineCrawler.iter_stores()` opens the ZIP with `open_zip()` and first groups the files by store using only their names: it reads the timestamp from each file name and skips files published on another date. Then, store by store, it parses the newest file that parses and yields the store. `TrgocentarCrawler.get_zip_stores()` also keeps the latest file per store, but keeps all stores in memory until the end.
 
 **Note**: `StudenacCrawler` (`studenac.py`) overrides `get_zip_contents()`. It extracts the ZIP with the `unzip` command-line tool, because the file names in older archives use an encoding that `zipfile` does not convert. Since 17.11.2026 the Studenac ZIP contains inner ZIPs, which it reads with `zipfile`. Studenac's ZIP contains XML files rather than CSVs.
 
@@ -334,7 +336,7 @@ def get_all_products(self, date: datetime.date) -> list[Store]:
             csv_content = self.fetch_text(url, ["iso-8859-2", "windows-1250"])
             store.items = self.parse_csv(csv_content, ";")
         except CrawlerBlocked:
-            raise  # crawl_chain() discards the run
+            raise  # ends the chain
         except Exception as e:
             logger.error(f"Error processing {url}: {e}", exc_info=True)
             continue
@@ -530,13 +532,14 @@ The `BaseCrawler` class provides a helper method, `parse_index_for_zip()`, which
 
 `BaseCrawler.crawl()` logs the start of the crawl, the number of stores and prices, and the elapsed time. It logs and re-raises errors. Crawlers do not need their own start and summary logging.
 
-`crawl_chain()` in `crawler/crawl.py` calls `get_all_products()` and handles the result:
+`crawl_chain()` in `crawler/crawl.py` reads the stores from `iter_stores()` and gives each one to a `ChainWriter` (`crawler/store/output.py`). The writer writes the price rows of each store to a part file in `<chain>/.parts`. `finish()` then writes the CSV files and removes the part files.
 
-- If `get_all_products()` raises (`CrawlerBlocked` or any other exception), `crawl_chain()` logs the error and returns an empty result. It writes no files for the chain.
-- If the crawler returned normally but `crawler.blocked` is set, it logs an error that the chain is incomplete and saves the stores collected before the block.
-- If the crawler returned no stores, it logs `No stores imported for <chain> on <date>` and writes no files.
+- If the crawler raises (`CrawlerBlocked` or any other exception), `crawl_chain()` logs `Error crawling <chain> for <date>, keeping the <n> store(s) before it` and saves the stores yielded before the error. Each of them is complete, because a crawler yields a store only after all its items are parsed.
+- If `crawler.blocked` is set, it logs an error that the chain is incomplete and saves the stores collected before the block.
+- If the crawler yielded no stores, it logs `No stores imported for <chain> on <date>` and writes no files.
+- If the writer fails (for example a disk error), `crawl_chain()` removes the part files and re-raises. No CSV files are written for the chain, and `crawler.cli.crawl` exits with code 1.
 
-`crawl()` continues with the next chain in each of these cases. Because of this, `crawler.cli.crawl` exits with code 0 when a chain fails. Check the error messages in the log, or the row counts (see "Daily Runner").
+`crawl()` continues with the next chain in the first three cases. Because of this, `crawler.cli.crawl` exits with code 0 when a crawler fails. Check the error messages in the log, or the row counts (see "Daily Runner"). The daily runner tries a chain again in its next run while a count is below 90% of `EXPECTED`.
 
 ## Data Conventions
 
@@ -569,7 +572,7 @@ When one store fails after the retries (download or parse error), log the error 
 
 ### Dates (rule for new crawlers)
 
-`get_all_products(date)` must use `date` to select the files to read. If the source has no data for that date, return an empty list (or raise `ValueError`). Do not return the latest available file instead. Not all existing crawlers follow this rule yet; new crawlers must follow it. For examples, see `PlodineCrawler.get_all_products()`, `LidlCrawler.get_index()` and `MetroCrawler.get_index()`.
+`iter_stores(date)` (or `get_all_products(date)`) must use `date` to select the files to read. If the source has no data for that date, yield no stores (or raise `ValueError`). Do not return the latest available file instead. Not all existing crawlers follow this rule yet; new crawlers must follow it. For examples, see `PlodineCrawler.select_files()`, `LidlCrawler.get_index()` and `MetroCrawler.get_index()`.
 
 ## Code Style and Conventions
 
@@ -609,8 +612,8 @@ class ChainCrawler(BaseCrawler):
     # 5. Chain-specific data fixing
     def fix_product_data(self, data): ...  # if needed
 
-    # 6. Main entry point
-    def get_all_products(self, date): ...
+    # 6. Main entry point: yield each store when it is complete
+    def iter_stores(self, date): ...
 ```
 
 ### 3. Error Handling
@@ -619,7 +622,7 @@ class ChainCrawler(BaseCrawler):
 - Log warnings for non-critical errors (e.g., parsing single products)
 - Log errors for store-level failures
 - Continue processing remaining stores on individual failures
-- Do not catch `CrawlerBlocked` per store: stop the loop and return the stores collected so far, or let it propagate
+- Do not catch `CrawlerBlocked` per store: stop the loop and return (or stop yielding) the stores collected so far, or let it propagate
 - Raise exceptions only for complete crawl failures (for example, no price list for the date)
 
 ### 4. Documentation
@@ -741,7 +744,7 @@ uv run pytest tests/crawler
 
 ### CSV Structure
 
-`save_chain()` writes three CSV files per chain, in `<output_path>/<YYYY-MM-DD>/<chain>/`:
+`ChainWriter` writes three CSV files per chain, in `<output_path>/<YYYY-MM-DD>/<chain>/`:
 
 1. **stores.csv**: Store information
    - `store_id`, `type`, `address`, `city`, `zipcode`

@@ -2,7 +2,7 @@ import datetime
 import logging
 import os
 import re
-from typing import Iterator
+from typing import Generator
 from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
@@ -271,10 +271,7 @@ class NtlCrawler(BaseCrawler):
         logger.info(f"Found {len(urls)} NTL CSV files for {date:%Y-%m-%d}")
         return urls
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
-        return list(self.iter_all_products(date))
-
-    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         """
         Main method to fetch and parse all NTL store, product, and price info.
 

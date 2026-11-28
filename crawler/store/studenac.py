@@ -4,7 +4,7 @@ import re
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Generator, Iterator, Optional, Tuple
+from typing import Generator, Optional, Tuple
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from lxml import etree  # type: ignore
@@ -163,24 +163,18 @@ class StudenacCrawler(BaseCrawler):
             logger.error(f"Failed to parse XML: {e}", exc_info=True)
             return None
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
-        return list(self.iter_all_products(date))
-
-    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         """
-        Main method to fetch and parse all products from Studenac's price lists.
+        Fetch Studenac's price lists and yield the stores one at a time.
 
         Args:
             date: The date for which to fetch the price list
 
         Yields:
-            Store objects, each containing its products.
+            Store objects, each with its products.
 
         Raises:
-            ValueError: If the price list cannot be fetched or parsed
-
-        Fork change (2026-11-17): a generator yielding one store at a time.
-        Since 2026-11-17 the daily ZIP holds about 1,400 stores instead of ~20.
+            httpx.HTTPError: If the price list ZIP cannot be downloaded
         """
         zip_url = f"{self.BASE_URL}/cjenici/PROIZVODI-{date:%Y-%m-%d}.zip"
 
@@ -256,6 +250,7 @@ class StudenacCrawler(BaseCrawler):
                     continue
 
                 yield file_info.filename, content
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)

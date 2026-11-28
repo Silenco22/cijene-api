@@ -456,10 +456,29 @@ class TestKonzumIndex:
     @staticmethod
     def _page(n: int) -> str:
         links = "".join(
-            f"<a format='csv' href='/cjenici/download?title=S{n}-{i}'>x</a>"
+            f"<a href='https://files.example.test/20260925-S{n}-{i}.CSV'>x</a>"
             for i in range(2)
         )
         return f"<html>{links}</html>"
+
+    def test_parses_the_cloudfront_links(self):
+        """Since 2026-11-27 the index links straight to the files on CloudFront."""
+        url = (
+            "https://d2depcln7eup0h.cloudfront.net/20261127-SUPER,%C5%BDITNA%201A"
+            "%2010310%20IVANI%C4%86%20GRAD,0204,113814,27.11.2026,%2005-23.CSV"
+        )
+        page = (
+            f"<html><a href='/cjenici?date=2026-11-26'>26.11.2026.</a>"
+            f"<h5><a class='td-hover-underline' href='{url}'>SUPER,...</a></h5>"
+            f"<a class='btn' href='{url}'>Preuzmi</a></html>"
+        )
+        crawler = KonzumCrawler()
+
+        assert crawler.parse_index(page) == [url]
+
+        store = crawler.parse_store_info(url)
+        assert (store.store_type, store.store_id) == ("super", "0204")
+        assert (store.street_address, store.zipcode) == ("Žitna 1A", "10310")
 
     def _crawler(self, pages: dict[int, list[httpx.Response]], attempts: int = 6):
         def handler(request: httpx.Request) -> httpx.Response:
@@ -541,8 +560,8 @@ class TestKonzumSweep:
         # parse_index dedupes through a set, so which of several stores is served
         # first is not fixed. Tests here must not depend on the order.
         links = "".join(
-            f"<a format='csv' href='/cjenici/download?title="
-            f"{self.STORE_TITLE.replace('0603', f'060{n}').replace(' ', '+').replace(',', '%2C')}"
+            f"<a href='https://files.example.test/20260925-"
+            f"{self.STORE_TITLE.replace('0603', f'060{n}').replace(' ', '%20')}"
             f"'>x</a>"
             for n in range(stores)
         )

@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from crawler.store.models import Product, Store
-from crawler.store.output import PRICE_COLUMNS, transform_products
+from crawler.store.output import PRICE_COLUMNS, clean_row, price_row
 
 
 def _product(product_id: str, available: bool | None, **kwargs) -> Product:
@@ -60,16 +60,18 @@ def test_known_price_columns_keep_their_order():
     ]
 
 
-def test_price_rows_carry_availability():
-    _, _, prices = transform_products([_store()])
+def _price_rows() -> list[dict[str, str]]:
+    """The price rows of _store() as written to prices.csv."""
+    store = _store()
+    return [clean_row(price_row(store, product)) for product in store.items]
 
-    # Compare as save_csv writes them; True == 1, so raw values would not
-    # catch a bool leaking through as "True"/"False".
-    assert [str(p["available"]) for p in prices] == ["1", "0", ""]
+
+def test_price_rows_carry_availability():
+    assert [p["available"] for p in _price_rows()] == ["1", "0", ""]
 
 
 def test_price_rows_carry_special_sale_type_and_anchor_date():
-    _, _, prices = transform_products([_store()])
+    prices = _price_rows()
 
     assert [p["special_sale_type"] for p in prices] == ["Akcija", "", ""]
     assert [p["anchor_price_date"] for p in prices] == ["2025-05-02", "", ""]

@@ -1,7 +1,7 @@
 import datetime
 import logging
 import re
-from typing import Iterator
+from typing import Generator
 from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
@@ -165,10 +165,7 @@ class GavranovicCrawler(BaseCrawler):
             items=[],
         )
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
-        return list(self.iter_all_products(date))
-
-    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         """
         Fetch and parse all product and price data for the given date.
 

@@ -3,7 +3,7 @@ import json
 import logging
 import re
 import time
-from typing import Iterator, Optional
+from typing import Generator, Optional
 from urllib.parse import urlsplit
 
 from bs4 import BeautifulSoup, Tag
@@ -356,10 +356,7 @@ class BosoCrawler(BaseCrawler):
         logger.debug(f"Found {len(csv_links)} CSV files for {store_value} on {date}")
         return csv_links
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
-        return list(self.iter_all_products(date))
-
-    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         """
         Main method to fetch and parse all products from Boso's price lists.
 

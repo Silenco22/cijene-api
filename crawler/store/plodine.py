@@ -1,15 +1,22 @@
 import datetime
 import logging
 import re
-from tempfile import NamedTemporaryFile
-from typing import Iterator, Optional
-from zipfile import ZipFile
-
+from typing import Generator, NamedTuple, Optional
+from zipfile import ZipFile, ZipInfo
 
 from .base import BaseCrawler
 from crawler.store.models import Store
 
 logger = logging.getLogger(__name__)
+
+
+class StoreFile(NamedTuple):
+    """A store's CSV file in the ZIP, and the store as its name describes it."""
+
+    published: datetime.datetime
+    info: ZipInfo
+    store: Store  # without products
+
 
 # Wrong postcodes in Plodine's file names: (store_id, published) -> correct.
 # Keyed on the published value too, so a fix stops applying once Plodine
@@ -29,7 +36,8 @@ class PlodineCrawler(BaseCrawler):
 
     Since 2026-10-02 the daily ZIP also carries the previous day's CSVs,
     including intra-day updates, so a store can have several files in one ZIP.
-    Only files published on the requested date are used, latest one per store.
+    Only files published on the requested date are used: per store, the
+    newest one that parses.
     """
 
     CHAIN = "plodine"
@@ -171,84 +179,120 @@ class PlodineCrawler(BaseCrawler):
         except ValueError:
             return None
 
-    def get_all_products(self, date: datetime.date) -> list[Store]:
-        return list(self.iter_all_products(date))
-
-    def iter_all_products(self, date: datetime.date) -> Iterator[Store]:
+    def iter_stores(self, date: datetime.date) -> Generator[Store, None, None]:
         """
-        Main method to fetch and parse all products from Plodine's price lists.
+        Fetch Plodine's price list ZIP for the date and yield its stores.
 
-        Fork change (2026-10-08): a generator yielding one store at a time.
-        Since NN 101/2026 the ZIP holds ~6M price rows (155 stores, each listing
-        the whole assortment), and parsing every store before returning peaked
-        at 7 GB. Pass 1 reads only the file names to pick the newest file per
-        store; pass 2 parses and yields them one by one, falling back to the
-        store's older file when the newest one does not parse.
+        The files are chosen by name first, so that each store can be parsed
+        and yielded on its own.
 
         Args:
             date: The date for which to fetch the price list
 
         Yields:
-            Store objects, each containing its products.
+            Store objects, each with its products, in the order of each
+            store's first file in the ZIP.
 
         Raises:
-            ValueError: If the price list ZIP cannot be found or processed
+            ValueError: If there is no price list ZIP for the date
         """
         zip_url = self.get_index(date)
 
-        with NamedTemporaryFile(mode="w+b") as temp_zip:
-            self.fetch_binary(zip_url, temp_zip)
-            temp_zip.seek(0)
+        with self.open_zip(zip_url) as zip_fp:
+            for files in self.select_files(zip_fp, date).values():
+                store = self.parse_store_files(zip_fp, files)
+                if store:
+                    yield store
 
-            with ZipFile(temp_zip, "r") as zip_fp:
-                # store_id -> [(publication timestamp, filename, store)]
-                candidates: dict[str, list[tuple[datetime.datetime, str, Store]]] = {}
+    def select_files(
+        self, zip_fp: ZipFile, date: datetime.date
+    ) -> dict[str, list[StoreFile]]:
+        """
+        Group the CSV files of the date in the ZIP by store, by name only.
 
-                for file_info in zip_fp.infolist():
-                    filename = file_info.filename
-                    if not filename.endswith(".csv"):
-                        continue
+        Args:
+            zip_fp: The open price list ZIP
+            date: Only files published on this date are used
 
-                    published = self.parse_file_timestamp(filename)
-                    if published is None:
-                        logger.warning(
-                            f"Skipping CSV {filename}: no timestamp in filename"
-                        )
-                        continue
-                    if published.date() != date:
-                        logger.debug(
-                            f"Skipping CSV {filename}: published on {published:%Y-%m-%d}"
-                        )
-                        continue
+        Returns:
+            The files of each store, newest first. Files with the same
+            timestamp keep their order in the ZIP. Stores are in the order of
+            their first file in the ZIP.
+        """
+        groups: dict[str, list[StoreFile]] = {}
 
-                    store = self.parse_store_from_filename(filename)
-                    if not store:
-                        logger.warning(
-                            f"Skipping CSV {filename} due to store parsing failure"
-                        )
-                        continue
+        for info in zip_fp.infolist():
+            filename = info.filename
+            if not filename.endswith(".csv"):
+                continue
 
-                    candidates.setdefault(store.store_id, []).append(
-                        (published, filename, store)
-                    )
+            logger.debug(f"Processing file: {filename}")
 
-                for files in candidates.values():
-                    # Newest first; an older file only if the newer ones fail.
-                    for published, filename, store in sorted(
-                        files, key=lambda f: f[0], reverse=True
-                    ):
-                        try:
-                            content = zip_fp.read(filename)
-                            store.items = self.parse_csv(
-                                content.decode("utf-8"), delimiter=";"
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Error processing CSV {filename}: {e}", exc_info=True
-                            )
-                            continue
-                        yield store
-                        break
+            published = self.parse_file_timestamp(filename)
+            if published is None:
+                logger.warning(f"Skipping CSV {filename}: no timestamp in filename")
+                continue
+            if published.date() != date:
+                logger.debug(
+                    f"Skipping CSV {filename}: published on {published:%Y-%m-%d}"
+                )
+                continue
+
+            store = self.parse_store_from_filename(filename)
+            if not store:
+                logger.warning(f"Skipping CSV {filename} due to store parsing failure")
+                continue
+
+            groups.setdefault(store.store_id, []).append(
+                StoreFile(published, info, store)
+            )
+
+        for files in groups.values():
+            files.sort(key=lambda f: f.published, reverse=True)  # stable
+
+        return groups
+
+    def parse_store_files(
+        self, zip_fp: ZipFile, files: list[StoreFile]
+    ) -> Store | None:
+        """
+        Parse the newest of a store's files that can be parsed.
+
+        A file that cannot be read or parsed is logged, and the next newest
+        one is tried.
+
+        Args:
+            zip_fp: The open price list ZIP
+            files: The store's files, newest first
+
+        Returns:
+            The store as named in the file used, with its products, or None
+            if no file could be parsed.
+        """
+        for i, file in enumerate(files):
+            filename = file.info.filename
+            try:
+                with zip_fp.open(file.info) as fp:
+                    content = fp.read()
+            except Exception as e:
+                logger.error(f"Error processing file {filename}: {e}", exc_info=True)
+                continue
+
+            try:
+                products = self.parse_csv(content.decode("utf-8"), delimiter=";")
+            except Exception as e:
+                logger.error(f"Error processing CSV {filename}: {e}", exc_info=True)
+                continue
+
+            for older in files[i + 1 :]:
+                logger.debug(
+                    f"Skipping CSV {older.info.filename}: newer file for the same store"
+                )
+
+            # A copy: `files` keeps its Store, which must not hold the products
+            return file.store.model_copy(update={"items": products})
+
+        return None
 
     def fix_product_data(self, data: dict) -> dict:
         """Mirror the promotional price for the NN 101/2026 format."""
